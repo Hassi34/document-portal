@@ -1,0 +1,36 @@
+[project]
+name = "src"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "PyYAML>=6.0.2",
+    "docx2txt>=0.9",
+    "faiss-cpu>=1.11.0.post1",
+    "fastapi>=0.116.1",
+    "jupyter>=1.1.1",
+    "langchain>=0.3.27",
+    "langchain-community>=0.3.27",
+    "langchain-core>=0.3.72",
+    "langchain-google-genai>=2.1.8",
+    "langchain-groq>=0.3.6",
+    "langchain-openai>=0.3.28",
+    "pandas>=2.3.1",
+    "pymupdf>=1.26.3",
+    "pypdf>=5.9.0",
+    "pytest>=8.4.1",
+    "python-dotenv>=1.1.1",
+    "python-multipart>=0.0.20",
+    "streamlit>=1.48.0",
+    "structlog>=25.4.0",
+    "uvicorn>=0.35.0",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+backend-path = ["src"]
+
+[tool.setuptools.packages.find]
+where = ["."]

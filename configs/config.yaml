@@ -1,0 +1,73 @@
+api:
+  intro:
+    API_TITLE: Document Portal API
+    API_DESCRIPTION: Document Portal for analyzing, comparing, and chatting with documents.
+
+  openapi_tags:
+    - name: infra
+      description: Infrastructure and operational endpoints (health, diagnostics)
+
+  operational-config:
+    API_VERSION_END_POINT: /api/v1
+    APP_HOST: 0.0.0.0
+    APP_PORT: 80
+    API_VERSION: 0.1
+    ACCESS_TOKEN_EXPIRE_MINUTES: 60
+    REFRESH_TOKEN_EXPIRE_MINUTES: 1080 # 7 DAYS
+    DEBUG: true
+
+
+data:
+  storage:
+    document_analysis: "data/document_analysis"
+    document_compare: "data/document_compare"
+    document_chat: "data/document_chat"
+  supported_extensions:
+    - .pdf
+    - .docx
+    - .txt
+
+ai:
+  vector_db:
+    faiss:
+      index_name: "document_portal"
+      index_path: "data/faiss_index"
+
+  embedding_model:
+    google:
+      model_name: "text-embedding-004"
+    openai:
+      model_name: "text-embedding-3-small"
+    azure-openai:
+      # For Azure OpenAI embeddings, set AZURE_OPENAI_API_EMBEDDING_DEPLOYMENT_NAME in env
+      # model_name documents the intended base model behind the deployment
+      model_name: "text-embedding-3-large"
+
+  retriever:
+    top_k: 10
+    search_type: "similarity"
+    chunk_size: 1000
+    chunk_overlap: 200
+
+  llm:
+    groq:
+      model_name: "deepseek-r1-distill-llama-70b"
+      temperature: 0
+      max_output_tokens: 2048
+
+    google:
+      model_name: "gemini-2.0-flash"
+      temperature: 0
+      max_output_tokens: 2048
+
+    openai:
+      model_name: "gpt-4o-mini"
+      temperature: 0
+      max_output_tokens: 2048
+    azure-openai:
+      # Uses Azure OpenAI via deployment
+      # Requires env: AZURE_OPENAI_API_KEY, AZURE_OPENAI_API_INSTANCE_NAME,
+      # AZURE_OPENAI_API_DEPLOYMENT_NAME, AZURE_OPENAI_API_VERSION
+      model_name: "gpt-4o"
+      temperature: 0
+      max_output_tokens: 2048
