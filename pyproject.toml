@@ -1,5 +1,5 @@
 [project]
-name = "src"
+name = "DocumentPortal"
 version = "0.1.0"
 description = "A FastAPI-powered application to analyze, compare, and chat with documents using configurable RAG pipelines and a FAISS vector store."
 readme = "README.md"
