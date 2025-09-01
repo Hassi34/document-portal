@@ -11,17 +11,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     UV_LINK_MODE=copy \
     DOCKER_BUILDKIT=1
 
-# Copy project manifests first for better layer caching (with lockfile)
-COPY pyproject.toml uv.lock ./
+# Copy project manifests and code needed for building the local package
+COPY pyproject.toml uv.lock README.md ./
+COPY src ./src
+COPY configs ./configs
 
 # Create a local virtualenv with pinned runtime deps from the lockfile
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
-
-# Copy application source and config (exclude data/logs via .dockerignore)
-COPY src ./src
-COPY configs ./configs
-COPY README.md ./README.md
 
 
 FROM python:3.10-slim-bookworm AS runtime
@@ -56,4 +53,4 @@ USER appuser
 EXPOSE 8080
 
 # Start FastAPI with uvicorn
-CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8080", "--proxy-headers"]
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8080", "--proxy-headers"]

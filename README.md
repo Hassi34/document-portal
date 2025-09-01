@@ -128,7 +128,7 @@ Notes:
 
 ```bash
 # From project root, with your venv activated
-uvicorn src.api.main:app --host 0.0.0.0 --port 8080 --reload
+uvicorn api.main:app --host 0.0.0.0 --port 8080 --reload
 ```
 
 Open:
