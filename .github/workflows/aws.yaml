@@ -19,11 +19,7 @@ permissions:
 jobs:
   check-status:
     runs-on: ubuntu-latest
-    if: >
-      ${{ github.event.workflow_run.conclusion == 'success' && (
-            (github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main') ||
-            (github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.pull_requests && github.event.workflow_run.pull_requests[0].base.ref == 'main')
-          ) }}
+    if: ${{github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main'}}
     steps:
       - name: CI passed on main branch
         run: echo "CI passed on main branch, proceeding to build and deploy."
@@ -35,19 +31,11 @@ jobs:
     name: Build & Push Docker Image
     needs: [check-status]
     runs-on: ubuntu-latest
-    if: >
-      ${{ github.event.workflow_run.conclusion == 'success' && (
-            (github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main') ||
-            (github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.pull_requests && github.event.workflow_run.pull_requests[0].base.ref == 'main')
-          ) }}
     outputs:
       image: ${{ steps.build-image.outputs.image }}
     steps:
-      - name: Checkout Repo (same ref as CI run)
+      - name: Checkout Repo
         uses: actions/checkout@v4
-        with:
-          repository: ${{ github.event.workflow_run.head_repository.full_name }}
-          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -64,7 +52,7 @@ jobs:
         id: build-image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
+          IMAGE_TAG: ${{ github.sha }}
         run: |
           IMAGE_URI=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
@@ -79,17 +67,12 @@ jobs:
     name: Deploy to ECS Fargate
     needs: build-and-push
     runs-on: ubuntu-latest
-    if: >
-      ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' }}
     steps:
-      - name: Checkout Repo (same ref as CI run)
+      - name: Checkout Repo
         uses: actions/checkout@v4
-        with:
-          repository: ${{ github.event.workflow_run.head_repository.full_name }}
-          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Configure AWS Credentials
-  uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
