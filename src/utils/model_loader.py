@@ -63,11 +63,26 @@ class ApiKeyManager:
     def get(self, key: str, default: Optional[str] = None) -> Optional[str]:
         return self._store.get(key, os.getenv(key, default))
 
-    def require(self, keys: List[str]) -> None:
+    def require(self, keys: str | List[str]) -> Optional[str]:
+        """Ensure required env var(s) exist.
+
+        - If a single key (str) is provided, return its value on success.
+        - If a list is provided, validate all exist and return None.
+        """
+        if isinstance(keys, str):
+            val = self.get(keys)
+            if not val:
+                log.error("Missing required key", missing_key=keys)
+                raise DocumentPortalException(
+                    f"Missing required API key/var: {keys}", sys
+                )
+            return val
+
         missing = [k for k in keys if not self.get(k)]
         if missing:
             log.error("Missing required keys", missing_keys=missing)
             raise DocumentPortalException("Missing required API keys/vars", sys)
+        return None
 
 
 class ModelLoader:
@@ -94,7 +109,7 @@ class ModelLoader:
 
             embedding_block = self.config["ai"]["embedding_model"]
 
-            provider_key = os.getenv("EMBEDDING_PROVIDER", "openai")  # Default openai
+            provider_key = self.api_keys.require("EMBEDDING_PROVIDER")
             # Back-compat: allow 'azure' but prefer 'azure-openai' config key
             if provider_key == "azure":
                 provider_key = "azure-openai"
@@ -161,7 +176,7 @@ class ModelLoader:
 
         log.info("Loading LLM...")
 
-        provider_key = os.getenv("LLM_PROVIDER", "openai")  # Default openai
+        provider_key = self.api_keys.require("LLM_PROVIDER")
         # Back-compat: allow 'azure' but prefer 'azure-openai' config key
         if provider_key == "azure":
             provider_key = "azure-openai"
