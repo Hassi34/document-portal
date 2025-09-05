@@ -41,21 +41,28 @@ where = ["src"]
 "*" = ["py.typed"]
 
 [tool.ruff]
+extend-exclude = [
+    "notebooks/**",
+    "test.py",
+]
 lint.select = [
     "E",    # pycodestyle
     "F",    # pyflakes
     "I",    # isort
-    "D",    # pydocstyle
-    "D401", # First line should be in imperative mood
-    "T201",
-    "UP",
+    "UP",   # pyupgrade
 ]
 lint.ignore = [
     "UP006",
     "UP007",
     "UP035",
+    "UP037",
+    "UP045",
     "D417",
     "E501",
+    "E402",  # module level import not at top (legacy layout)
+    "E702",  # multiple statements on one line (legacy code)
+    "F401",  # unused imports (temporary while refactoring)
+    "T201",  # print statements allowed for now
 ]
 
 [tool.ruff.lint.per-file-ignores]

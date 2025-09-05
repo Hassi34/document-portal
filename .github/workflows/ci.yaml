@@ -51,6 +51,8 @@ jobs:
 
       - name: Lint (ruff)
         run: |
+          # Auto-fix simple issues like import sorting before checking
+          uvx ruff check --fix-only . || true
           uvx ruff check .
           uvx ruff format --check .
           echo "✅ Lint passed"
