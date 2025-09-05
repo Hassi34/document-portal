@@ -42,7 +42,7 @@ class ApiKeyManager:
                 if not isinstance(parsed, dict):
                     raise ValueError("API keys env is not a valid JSON object")
                 for k, v in parsed.items():
-                    if isinstance(k, str) and isinstance(v, (str, int, float)):
+                    if isinstance(k, str) and isinstance(v, str | int | float):
                         self._store[k] = str(v)
                 log.info("Loaded API keys from JSON env", env_var=env_name)
             except Exception as e:
