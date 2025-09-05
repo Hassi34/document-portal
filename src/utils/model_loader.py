@@ -1,8 +1,9 @@
 """Helpers to load embeddings and LLMs based on config + environment."""
 
+import json
 import os
 import sys
-from typing import Any
+from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
 from src.utils.config_loader import load_config
@@ -19,53 +20,68 @@ from src.utils.exception.custom_exception import DocumentPortalException
 
 log = CustomLogger().get_logger(__name__)
 
+
+class ApiKeyManager:
+    """Centralized API key/env var loader with JSON bundle support.
+
+    Reads API_KEYS (or configured name) as JSON, and falls back to individual env vars for
+    the configured known keys from YAML. Keeps fallbacks minimal, per guidance.
+    """
+
+    def __init__(self) -> None:
+        cfg = load_config()
+        secrets_cfg = cfg.get("secrets", {})
+        self._known_keys = secrets_cfg.get("known_keys", [])
+        env_name = secrets_cfg.get("aws_secret_manager_keys_env_var", "API_KEYS")
+
+        self._store = {}
+        raw = os.getenv(env_name)
+        if raw:
+            try:
+                parsed = json.loads(raw)
+                if not isinstance(parsed, dict):
+                    raise ValueError("API keys env is not a valid JSON object")
+                for k, v in parsed.items():
+                    if isinstance(k, str) and isinstance(v, (str, int, float)):
+                        self._store[k] = str(v)
+                log.info("Loaded API keys from JSON env", env_var=env_name)
+            except Exception as e:
+                log.warning("Failed to parse API keys JSON", env_var=env_name, error=str(e))
+
+        # Minimal fallback: individual env vars for configured keys only
+        for key in self._known_keys:
+            if key not in self._store and os.getenv(key):
+                self._store[key] = os.getenv(key, "")
+
+        masked = {k: (v[:6] + "..." if v else "") for k, v in self._store.items() if v}
+        if masked:
+            log.info("API keys loaded", keys=masked)
+
+    def get(self, key: str, default: Optional[str] = None) -> Optional[str]:
+        return self._store.get(key, os.getenv(key, default))
+
+    def require(self, keys: List[str]) -> None:
+        missing = [k for k in keys if not self.get(k)]
+        if missing:
+            log.error("Missing required keys", missing_keys=missing)
+            raise DocumentPortalException("Missing required API keys/vars", sys)
+
+
 class ModelLoader:
     """Load embedding and LLM models configured via YAML and env vars."""
 
     def __init__(self) -> None:
-        load_dotenv()
-        self._validate_env()
+        # Only load .env locally; in prod rely on env/Secrets
+        if os.getenv("ENV", "local").lower() != "production":
+            load_dotenv()
+            log.info("Running in LOCAL mode: .env loaded")
+        else:
+            log.info("Running in PRODUCTION mode")
+
+        self.api_keys = ApiKeyManager()
         self.config = load_config()
         log.info("Configuration loaded successfully", config_keys=list(self.config.keys()))
-        
-    def _validate_env(self) -> None:
-        """Validate required API keys and cache them into self.api_keys.
 
-        Includes optional Azure OpenAI variables when provider is selected.
-        """
-        # Global required keys (now includes Azure key as requested)
-        required_vars = [
-            "GOOGLE_API_KEY",
-            "GROQ_API_KEY",
-            "OPENAI_API_KEY",
-            "AZURE_OPENAI_API_KEY",
-        ]
-        # Azure-specific vars (required when provider is azure)
-        azure_vars = [
-            "AZURE_OPENAI_API_INSTANCE_NAME",
-            "AZURE_OPENAI_API_DEPLOYMENT_NAME",
-            "AZURE_OPENAI_API_VERSION",
-        ]
-        self.api_keys = {key: os.getenv(key) for key in required_vars + azure_vars}
-        missing_required = [k for k in required_vars if not self.api_keys.get(k)]
-        if missing_required:
-            log.error("Missing required environment variables", missing_vars=missing_required)
-            raise DocumentPortalException("Missing required environment variables", sys)
-        # Provider-specific validation
-        provider_embedding = os.getenv("EMBEDDING_PROVIDER", "openai").lower()
-        provider_llm = os.getenv("LLM_PROVIDER", "openai").lower()
-        if provider_embedding in ("azure", "azure-openai") or provider_llm in ("azure", "azure-openai"):
-            for k in azure_vars:
-                if not self.api_keys.get(k):
-                    log.error("Missing Azure OpenAI environment variable", var=k)
-                    raise DocumentPortalException("Missing Azure OpenAI environment variables", sys)
-        # Validate base providers when chosen
-        if provider_embedding == "openai" and not self.api_keys.get("OPENAI_API_KEY"):
-            raise DocumentPortalException("Missing OPENAI_API_KEY for embeddings", sys)
-        if provider_llm == "openai" and not self.api_keys.get("OPENAI_API_KEY"):
-            raise DocumentPortalException("Missing OPENAI_API_KEY for LLM", sys)
-        log.info("Environment variables validated", available_keys=[k for k in self.api_keys if self.api_keys[k]])
-        
     def load_embeddings(self):
         """Load and return the embedding model based on provider configuration."""
         try:
@@ -87,27 +103,29 @@ class ModelLoader:
             log.info("Loading embedding model", provider=provider_key, model=model_name)
 
             if provider_key == "google":
+                self.api_keys.require(["GOOGLE_API_KEY"]) 
                 return GoogleGenerativeAIEmbeddings(
                     model=model_name,
-                    google_api_key=self.api_keys["GOOGLE_API_KEY"]
+                    google_api_key=self.api_keys.get("GOOGLE_API_KEY")
                 )
             elif provider_key == "openai":
+                self.api_keys.require(["OPENAI_API_KEY"]) 
                 return OpenAIEmbeddings(
                     model=model_name,
-                    openai_api_key=self.api_keys["OPENAI_API_KEY"]
+                    openai_api_key=self.api_keys.get("OPENAI_API_KEY")
                 )
             elif provider_key == "azure-openai":
                 # For Azure embeddings, you must set a dedicated embedding deployment
-                deployment = os.getenv("AZURE_OPENAI_API_EMBEDDING_DEPLOYMENT_NAME")
-                if not deployment:
-                    log.error(
-                        "Azure embedding deployment name not set",
-                        env_var="AZURE_OPENAI_API_EMBEDDING_DEPLOYMENT_NAME",
-                    )
-                    raise DocumentPortalException("Missing Azure embedding deployment env", sys)
-                api_key = self.api_keys["AZURE_OPENAI_API_KEY"]
-                instance = self.api_keys["AZURE_OPENAI_API_INSTANCE_NAME"]
-                api_version = self.api_keys["AZURE_OPENAI_API_VERSION"]
+                self.api_keys.require([
+                    "AZURE_OPENAI_API_KEY",
+                    "AZURE_OPENAI_API_INSTANCE_NAME",
+                    "AZURE_OPENAI_API_VERSION",
+                    "AZURE_OPENAI_API_EMBEDDING_DEPLOYMENT_NAME",
+                ])
+                deployment = self.api_keys.get("AZURE_OPENAI_API_EMBEDDING_DEPLOYMENT_NAME")
+                api_key = self.api_keys.get("AZURE_OPENAI_API_KEY")
+                instance = self.api_keys.get("AZURE_OPENAI_API_INSTANCE_NAME")
+                api_version = self.api_keys.get("AZURE_OPENAI_API_VERSION")
                 azure_endpoint = f"https://{instance}.openai.azure.com/"
                 # Use Azure-specific embeddings wrapper per docs
                 return AzureOpenAIEmbeddings(
@@ -148,35 +166,45 @@ class ModelLoader:
         log.info("Loading LLM", provider=provider_key, model=model_name, temperature=temperature, max_tokens=max_tokens)
 
         if provider_key == "google":
+            self.api_keys.require(["GOOGLE_API_KEY"]) 
             llm = ChatGoogleGenerativeAI(
                 model=model_name,
                 temperature=temperature,
                 max_output_tokens=max_tokens,
+                google_api_key=self.api_keys.get("GOOGLE_API_KEY"),
             )
             return llm
 
         elif provider_key == "groq":
+            self.api_keys.require(["GROQ_API_KEY"]) 
             llm = ChatGroq(
                 model=model_name,
-                api_key=self.api_keys["GROQ_API_KEY"],
+                api_key=self.api_keys.get("GROQ_API_KEY"),
                 temperature=temperature,
             )
             return llm
 
         elif provider_key == "openai":
+            self.api_keys.require(["OPENAI_API_KEY"]) 
             return ChatOpenAI(
                 model=model_name,
-                api_key=self.api_keys["OPENAI_API_KEY"],
+                api_key=self.api_keys.get("OPENAI_API_KEY"),
                 temperature=temperature,
                 max_tokens=max_tokens,
             )
 
         elif provider_key == "azure-openai":
             # Azure OpenAI chat via Azure-specific wrapper per docs
-            api_key = self.api_keys["AZURE_OPENAI_API_KEY"]
-            instance = self.api_keys["AZURE_OPENAI_API_INSTANCE_NAME"]
-            deployment = self.api_keys["AZURE_OPENAI_API_DEPLOYMENT_NAME"]
-            api_version = self.api_keys["AZURE_OPENAI_API_VERSION"]
+            self.api_keys.require([
+                "AZURE_OPENAI_API_KEY",
+                "AZURE_OPENAI_API_INSTANCE_NAME",
+                "AZURE_OPENAI_API_DEPLOYMENT_NAME",
+                "AZURE_OPENAI_API_VERSION",
+            ])
+            api_key = self.api_keys.get("AZURE_OPENAI_API_KEY")
+            instance = self.api_keys.get("AZURE_OPENAI_API_INSTANCE_NAME")
+            deployment = self.api_keys.get("AZURE_OPENAI_API_DEPLOYMENT_NAME")
+            api_version = self.api_keys.get("AZURE_OPENAI_API_VERSION")
             azure_endpoint = f"https://{instance}.openai.azure.com/"
             return AzureChatOpenAI(
                 azure_endpoint=azure_endpoint,
@@ -201,7 +229,7 @@ if __name__ == "__main__":
     print(f"Embedding Model Loaded: {embeddings}")
     
     # Test the ModelLoader
-    result=embeddings.embed_query("Hello, how are you?")
+    result = embeddings.embed_query("Hello, how are you?")
     print(f"Embedding Result: {result}")
     
     # Test LLM loading based on YAML config
@@ -209,5 +237,5 @@ if __name__ == "__main__":
     print(f"LLM Loaded: {llm}")
     
     # Test the ModelLoader
-    result=llm.invoke("Hello, how are you?")
+    result = llm.invoke("Hello, how are you?")
     print(f"LLM Result: {result.content}")
