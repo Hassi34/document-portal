@@ -62,5 +62,5 @@ jobs:
 
       - name: Run unit tests
         run: |
-          uv run pytest -q
+          uv run pytest -q -s
           echo "✅ Tests passed"
