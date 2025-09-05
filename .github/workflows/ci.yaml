@@ -23,17 +23,20 @@ jobs:
         run: echo "✅ Python setup succeeded"
 
       - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Success (uv install)
+        if: success()
         run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh -s -- -y
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
           uv --version
           echo "✅ uv installed"
 
-      - name: Cache uv downloads and venv
+      - name: Cache venv
         uses: actions/cache@v4
         with:
           path: |
-            ~/.cache/uv
             .venv
           key: ${{ runner.os }}-uv-${{ hashFiles('uv.lock') }}
 

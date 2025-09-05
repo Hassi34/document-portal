@@ -124,6 +124,25 @@ Notes:
 - For Azure, use the deployment names you created in Azure AI Studio/Portal, not model names.
 - The loader will fail fast if required variables are missing.
 
+### Single JSON env for keys (ECS / secrets managers)
+
+You can provide all API keys via one JSON environment variable, whose name is configurable in `configs/config.yaml` at `secrets.aws_secret_manager_keys_env_var` (default: `API_KEYS`). Example value:
+
+```
+{
+  "OPENAI_API_KEY": "sk-...",
+  "GOOGLE_API_KEY": "...",
+  "GROQ_API_KEY": "...",
+  "AZURE_OPENAI_API_KEY": "...",
+  "AZURE_OPENAI_API_INSTANCE_NAME": "my-azure-openai",
+  "AZURE_OPENAI_API_VERSION": "2024-10-21",
+  "AZURE_OPENAI_API_DEPLOYMENT_NAME": "gpt-4o",
+  "AZURE_OPENAI_API_EMBEDDING_DEPLOYMENT_NAME": "text-embedding-3-large"
+}
+```
+
+The app reads this JSON first. If a key is not present there, it falls back to a same-named environment variable (only for keys listed in `secrets.known_keys`).
+
 ## Running the app
 
 ```bash
