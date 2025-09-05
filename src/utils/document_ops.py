@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 """Document helpers: loaders, concatenators, and adapters for FastAPI files."""
 
 from pathlib import Path
@@ -6,15 +7,11 @@ from typing import Iterable, List
 
 from fastapi import UploadFile
 from langchain.schema import Document
-from langchain_community.document_loaders import (
-    PyPDFLoader,
-    Docx2txtLoader,
-    TextLoader,
-)
+from langchain_community.document_loaders import Docx2txtLoader, PyPDFLoader, TextLoader
 
-from src.utils.logger import GLOBAL_LOGGER as log
-from src.utils.exception.custom_exception import DocumentPortalException
 from src.utils.config_loader import get_supported_extensions
+from src.utils.exception.custom_exception import DocumentPortalException
+from src.utils.logger import GLOBAL_LOGGER as log
 
 SUPPORTED_EXTENSIONS = get_supported_extensions()
 

@@ -1,17 +1,18 @@
+from pathlib import Path
 from typing import Dict
+
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pathlib import Path
 
 from src.api.routers import analyze as analyze_router
-from src.api.routers import compare as compare_router
 from src.api.routers import chat as chat_router
-from src.utils.logger import GLOBAL_LOGGER as log
-from src.utils.config_loader import load_config
+from src.api.routers import compare as compare_router
 from src.schemas.api.ouput import HealthResponse
+from src.utils.config_loader import load_config
+from src.utils.logger import GLOBAL_LOGGER as log
 
 # Load API configuration
 _cfg = load_config()
@@ -20,7 +21,10 @@ _api_tags = _cfg.get("api", {}).get("openapi_tags", [])
 _api_ops = _cfg.get("api", {}).get("operational-config", {})
 
 API_TITLE = _api_intro.get("API_TITLE", "Document Portal API")
-API_DESCRIPTION = _api_intro.get("API_DESCRIPTION", "Document Portal for analyzing, comparing, and chatting with documents.")
+API_DESCRIPTION = _api_intro.get(
+    "API_DESCRIPTION",
+    "Document Portal for analyzing, comparing, and chatting with documents.",
+)
 API_VERSION = str(_api_ops.get("API_VERSION", "0.1"))
 API_VERSION_END_POINT = _api_ops.get("API_VERSION_END_POINT", "/api/v1")
 DEBUG_FLAG = bool(_api_ops.get("DEBUG", False))
@@ -35,7 +39,9 @@ app = FastAPI(
 )
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-app.mount("/static", StaticFiles(directory=str(BASE_DIR / "client/static")), name="static")
+app.mount(
+    "/static", StaticFiles(directory=str(BASE_DIR / "client/static")), name="static"
+)
 templates = Jinja2Templates(directory=str(BASE_DIR / "client/templates"))
 
 app.add_middleware(
@@ -45,6 +51,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_ui(request: Request):
@@ -56,27 +63,47 @@ async def serve_ui(request: Request):
     resp.headers["Cache-Control"] = "no-store"
     return resp
 
+
 # Both unversioned and versioned health endpoints, tagged for clarity
-@app.get("/health", tags=["infra"], summary="Health (unversioned)", response_model=HealthResponse)  # stable infra URL
-@app.get(f"{API_VERSION_END_POINT}/health", tags=["infra"], summary="Health (v1)", response_model=HealthResponse)  # versioned alias
+@app.get(
+    "/health",
+    tags=["infra"],
+    summary="Health (unversioned)",
+    response_model=HealthResponse,
+)  # stable infra URL
+@app.get(
+    f"{API_VERSION_END_POINT}/health",
+    tags=["infra"],
+    summary="Health (v1)",
+    response_model=HealthResponse,
+)  # versioned alias
 def health() -> Dict[str, str]:
     log.info("Health check passed.")
     return {"status": "ok", "service": "document-portal"}
 
+
 # Register debug endpoint only when DEBUG flag is enabled
 if DEBUG_FLAG:
     # Both unversioned and versioned debug endpoints, grouped under 'infra'
-    @app.get("/debug/openapi", tags=["infra"], summary="Debug OpenAPI (unversioned)")  # dev-only
-    @app.get(f"{API_VERSION_END_POINT}/debug/openapi", tags=["infra"], summary="Debug OpenAPI (v1)")  # dev-only versioned
+    @app.get(
+        "/debug/openapi", tags=["infra"], summary="Debug OpenAPI (unversioned)"
+    )  # dev-only
+    @app.get(
+        f"{API_VERSION_END_POINT}/debug/openapi",
+        tags=["infra"],
+        summary="Debug OpenAPI (v1)",
+    )  # dev-only versioned
     def debug_openapi() -> Dict[str, str]:
         try:
             schema = app.openapi()
             return {"status": "ok", "paths_count": str(len(schema.get("paths", {})))}
         except Exception as e:
             import traceback
+
             tb = traceback.format_exc()
             log.exception("OpenAPI generation failed")
             return {"status": "error", "error": str(e), "trace": tb}
+
 
 # ---------- ANALYZE ----------
 app.include_router(analyze_router.router, prefix=API_VERSION_END_POINT)

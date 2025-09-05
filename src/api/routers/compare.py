@@ -1,17 +1,20 @@
 from typing import Any
-from fastapi import APIRouter, UploadFile, File, HTTPException
 
-from src.ai.document_ingestion.data_ingestion import DocumentComparator
+from fastapi import APIRouter, File, HTTPException, UploadFile
+
 from src.ai.document_compare.document_comparator import DocumentComparatorLLM
+from src.ai.document_ingestion.data_ingestion import DocumentComparator
+from src.schemas.api.ouput import CompareResponse
 from src.utils.document_ops import FastAPIFileAdapter
 from src.utils.logger import GLOBAL_LOGGER as log
-from src.schemas.api.ouput import CompareResponse
 
 router = APIRouter(prefix="/compare", tags=["compare"])
 
 
 @router.post("", response_model=CompareResponse)
-async def compare_documents(reference: UploadFile = File(...), actual: UploadFile = File(...)) -> Any:
+async def compare_documents(
+    reference: UploadFile = File(...), actual: UploadFile = File(...)
+) -> Any:
     try:
         log.info(f"Comparing files: {reference.filename} vs {actual.filename}")
         dc = DocumentComparator()

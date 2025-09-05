@@ -1,24 +1,37 @@
-from typing import List, Optional, Any
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
-from pathlib import Path
 import os
+from typing import Any, List
 
-from src.ai.document_ingestion.data_ingestion import ChatIngestor
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+
 from src.ai.document_chat.retrieval import ConversationalRAG
-from src.utils.document_ops import FastAPIFileAdapter
-from src.utils.config_loader import load_config
-from src.utils.logger import GLOBAL_LOGGER as log
+from src.ai.document_ingestion.data_ingestion import ChatIngestor
 from src.schemas.api.input import ChatIndexParams, ChatQueryParams
 from src.schemas.api.ouput import ChatIndexResponse, ChatQueryResponse
+from src.utils.config_loader import load_config
+from src.utils.document_ops import FastAPIFileAdapter
+from src.utils.logger import GLOBAL_LOGGER as log
 
 _cfg = load_config()
-FAISS_BASE = _cfg.get("ai", {}).get("vector_db", {}).get("faiss", {}).get("index_path", "data/faiss_index")
-UPLOAD_BASE = _cfg.get("data", {}).get("storage", {}).get("document_chat", "data/document_chat")
-FAISS_INDEX_NAME = _cfg.get("ai", {}).get("vector_db", {}).get("faiss", {}).get("index_name", "index")
+FAISS_BASE = (
+    _cfg.get("ai", {})
+    .get("vector_db", {})
+    .get("faiss", {})
+    .get("index_path", "data/faiss_index")
+)
+UPLOAD_BASE = (
+    _cfg.get("data", {}).get("storage", {}).get("document_chat", "data/document_chat")
+)
+FAISS_INDEX_NAME = (
+    _cfg.get("ai", {}).get("vector_db", {}).get("faiss", {}).get("index_name", "index")
+)
 RETRIEVER_TOP_K = _cfg.get("ai", {}).get("retriever", {}).get("top_k", 10)
-RETRIEVER_SEARCH_TYPE = _cfg.get("ai", {}).get("retriever", {}).get("search_type", "similarity")
+RETRIEVER_SEARCH_TYPE = (
+    _cfg.get("ai", {}).get("retriever", {}).get("search_type", "similarity")
+)
 RETRIEVER_CHUNK_SIZE = _cfg.get("ai", {}).get("retriever", {}).get("chunk_size", 1000)
-RETRIEVER_CHUNK_OVERLAP = _cfg.get("ai", {}).get("retriever", {}).get("chunk_overlap", 200)
+RETRIEVER_CHUNK_OVERLAP = (
+    _cfg.get("ai", {}).get("retriever", {}).get("chunk_overlap", 200)
+)
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -29,7 +42,9 @@ async def chat_build_index(
     params: ChatIndexParams = Depends(ChatIndexParams.as_form),
 ) -> Any:
     try:
-        log.info(f"Indexing chat session. Session ID: {params.session_id}, Files: {[f.filename for f in files]}")
+        log.info(
+            f"Indexing chat session. Session ID: {params.session_id}, Files: {[f.filename for f in files]}"
+        )
         wrapped = [FastAPIFileAdapter(f) for f in files]
         ci = ChatIngestor(
             temp_base=UPLOAD_BASE,
@@ -38,10 +53,17 @@ async def chat_build_index(
             session_id=params.session_id or None,
         )
         ci.built_retriver(
-            wrapped, chunk_size=params.chunk_size, chunk_overlap=params.chunk_overlap, k=params.k
+            wrapped,
+            chunk_size=params.chunk_size,
+            chunk_overlap=params.chunk_overlap,
+            k=params.k,
         )
         log.info(f"Index created successfully for session: {ci.session_id}")
-        return {"session_id": ci.session_id, "k": params.k, "use_session_dirs": params.use_session_dirs}
+        return {
+            "session_id": ci.session_id,
+            "k": params.k,
+            "use_session_dirs": params.use_session_dirs,
+        }
     except HTTPException:
         raise
     except Exception as e:
@@ -54,16 +76,32 @@ async def chat_query(
     params: ChatQueryParams = Depends(ChatQueryParams.as_form),
 ) -> Any:
     try:
-        log.info(f"Received chat query: '{params.question}' | session: {params.session_id}")
+        log.info(
+            f"Received chat query: '{params.question}' | session: {params.session_id}"
+        )
         if params.use_session_dirs and not params.session_id:
-            raise HTTPException(status_code=400, detail="session_id is required when use_session_dirs=True")
+            raise HTTPException(
+                status_code=400,
+                detail="session_id is required when use_session_dirs=True",
+            )
 
-        index_dir = os.path.join(FAISS_BASE, params.session_id) if params.use_session_dirs else FAISS_BASE  # type: ignore
+        index_dir = (
+            os.path.join(FAISS_BASE, params.session_id)
+            if params.use_session_dirs
+            else FAISS_BASE
+        )  # type: ignore
         if not os.path.isdir(index_dir):
-            raise HTTPException(status_code=404, detail=f"FAISS index not found at: {index_dir}")
+            raise HTTPException(
+                status_code=404, detail=f"FAISS index not found at: {index_dir}"
+            )
 
         rag = ConversationalRAG(session_id=params.session_id)
-        rag.load_retriever_from_faiss(index_dir, k=params.k, index_name=FAISS_INDEX_NAME, search_type=RETRIEVER_SEARCH_TYPE)
+        rag.load_retriever_from_faiss(
+            index_dir,
+            k=params.k,
+            index_name=FAISS_INDEX_NAME,
+            search_type=RETRIEVER_SEARCH_TYPE,
+        )
         response = rag.invoke(params.question, chat_history=[])
         log.info("Chat query handled successfully.")
 
@@ -71,7 +109,7 @@ async def chat_query(
             "answer": response,
             "session_id": params.session_id,
             "k": params.k,
-            "engine": "LCEL-RAG"
+            "engine": "LCEL-RAG",
         }
     except HTTPException:
         raise

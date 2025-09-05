@@ -19,7 +19,7 @@ def load_config(config_path: str = "configs/config.yaml") -> Dict[str, Any]:
     Returns:
         A dictionary with the parsed configuration.
     """
-    with open(config_path, "r", encoding="utf-8") as file:
+    with open(config_path, encoding="utf-8") as file:
         config = yaml.safe_load(file)
     return config
 
@@ -34,8 +34,8 @@ def get_supported_extensions() -> Set[str]:
         A set of normalized extensions.
     """
     cfg = load_config()
-    raw: Iterable[str] = (
-        cfg.get("data", {}).get("supported_extensions", [".pdf", ".docx", ".txt"])
+    raw: Iterable[str] = cfg.get("data", {}).get(
+        "supported_extensions", [".pdf", ".docx", ".txt"]
     )
     norm: Set[str] = set()
     for e in raw:

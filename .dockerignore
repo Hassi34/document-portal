@@ -1,0 +1,6 @@
+*
+!src
+!configs
+!pyproject.toml
+!README.md
+!uv.lock

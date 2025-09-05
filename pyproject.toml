@@ -1,5 +1,5 @@
 [project]
-name = "src"
+name = "DocumentPortal"
 version = "0.1.0"
 description = "A FastAPI-powered application to analyze, compare, and chat with documents using configurable RAG pipelines and a FAISS vector store."
 readme = "README.md"
@@ -28,9 +28,45 @@ dependencies = [
 ]
 
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=73.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
-backend-path = ["src"]
+
+[tool.setuptools.package-dir]
+"" = "src"
 
 [tool.setuptools.packages.find]
-where = ["."]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"*" = ["py.typed"]
+
+[tool.ruff]
+extend-exclude = [
+    "notebooks/**",
+    "test.py",
+]
+lint.select = [
+    "E",    # pycodestyle
+    "F",    # pyflakes
+    "I",    # isort
+    "UP",   # pyupgrade
+]
+lint.ignore = [
+    "UP006",
+    "UP007",
+    "UP035",
+    "UP037",
+    "UP045",
+    "D417",
+    "E501",
+    "E402",  # module level import not at top (legacy layout)
+    "E702",  # multiple statements on one line (legacy code)
+    "F401",  # unused imports (temporary while refactoring)
+    "T201",  # print statements allowed for now
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["D", "UP"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
