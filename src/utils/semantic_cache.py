@@ -1,5 +1,5 @@
-from typing import Optional
 import os
+from typing import Optional
 
 from src.utils.logger import GLOBAL_LOGGER as log
 
@@ -19,7 +19,9 @@ def _load_embeddings_for_provider(cfg: dict, provider: str):
 
     embedding_block = cfg.get("ai", {}).get("embedding_model", {})
     if provider not in embedding_block:
-        raise ValueError(f"Embedding provider '{provider}' not found in config.ai.embedding_model")
+        raise ValueError(
+            f"Embedding provider '{provider}' not found in config.ai.embedding_model"
+        )
 
     model_name = embedding_block[provider].get("model_name")
     keys = ApiKeyManager()
@@ -28,7 +30,9 @@ def _load_embeddings_for_provider(cfg: dict, provider: str):
         keys.require(["OPENAI_API_KEY"])
         from langchain_openai import OpenAIEmbeddings
 
-        return OpenAIEmbeddings(model=model_name, openai_api_key=keys.get("OPENAI_API_KEY"))
+        return OpenAIEmbeddings(
+            model=model_name, openai_api_key=keys.get("OPENAI_API_KEY")
+        )
 
     if provider == "google":
         keys.require(["GOOGLE_API_KEY"])
@@ -66,7 +70,9 @@ def _load_embeddings_for_provider(cfg: dict, provider: str):
     raise ValueError(f"Unsupported embedding provider: {provider}")
 
 
-def init_semantic_cache(redis_url: str, embedding_provider: str = "openai", cfg: Optional[dict] = None) -> None:
+def init_semantic_cache(
+    redis_url: str, embedding_provider: str = "openai", cfg: Optional[dict] = None
+) -> None:
     """Initialize LangChain semantic LLM cache with Redis.
 
     This sets a global cache via langchain.globals.set_llm_cache().
@@ -75,6 +81,7 @@ def init_semantic_cache(redis_url: str, embedding_provider: str = "openai", cfg:
     """
     try:
         from langchain.globals import set_llm_cache
+
         # Try dedicated package submodule first; fallback to community cache
         try:
             from langchain_redis.cache import RedisSemanticCache  # type: ignore
@@ -112,9 +119,11 @@ def maybe_init_semantic_cache(cfg: dict) -> None:
     # Load local .env for non-production runs so keys exist at startup
     try:
         import os as _os
+
         if _os.getenv("ENV", "local").lower() != "production":
             try:
                 from dotenv import load_dotenv  # type: ignore
+
                 load_dotenv()
                 log.info("Loaded .env for semantic cache initialization")
             except Exception:
@@ -129,7 +138,9 @@ def maybe_init_semantic_cache(cfg: dict) -> None:
     if not enabled:
         log.info("Semantic cache disabled via config")
         return
-    redis_url = os.getenv("REDIS_URL", cache_cfg.get("redis_url", "redis://localhost:6379"))
+    redis_url = os.getenv(
+        "REDIS_URL", cache_cfg.get("redis_url", "redis://localhost:6379")
+    )
     provider = cache_cfg.get("embedding_provider", "openai")
     # Normalize alias
     if provider == "azure":
