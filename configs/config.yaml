@@ -49,6 +49,11 @@ ai:
     chunk_size: 1000
     chunk_overlap: 200
 
+  output_parsing:
+    enable_fix: true
+    enable_retry: true
+    retry_max_attempts: 1
+
   llm:
     groq:
       model_name: "deepseek-r1-distill-llama-70b"

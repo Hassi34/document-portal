@@ -28,6 +28,7 @@ class ConversationalRAG:
     def __init__(self, session_id: Optional[str], retriever=None):
         try:
             self.session_id = session_id
+            self.cfg = load_config()
 
             # Load LLM and prompts once
             self.llm = self._load_llm()
@@ -61,7 +62,10 @@ class ConversationalRAG:
         search_type: Optional[str] = None,
         search_kwargs: Optional[Dict[str, Any]] = None,
     ):
-        """Load FAISS vectorstore from disk and build retriever + LCEL chain."""
+        """Load FAISS vectorstore from disk and build retriever + LCEL chain.
+
+        Falls back to config for defaults when arguments aren't provided.
+        """
         try:
             if not os.path.isdir(index_path):
                 raise FileNotFoundError(
@@ -69,26 +73,23 @@ class ConversationalRAG:
                 )
 
             embeddings = ModelLoader().load_embeddings()
-            # Resolve default index_name from config if not provided
+            # Resolve defaults from cached config
             if not index_name:
-                cfg = load_config()
                 index_name = (
-                    cfg.get("ai", {})
+                    self.cfg.get("ai", {})
                     .get("vector_db", {})
                     .get("faiss", {})
                     .get("index_name", "index")
                 )
-            # Resolve default retriever settings if not provided
-            if k is None or search_type is None:
-                cfg = "cfg" in locals() and cfg or load_config()
-                if k is None:
-                    k = cfg.get("ai", {}).get("retriever", {}).get("top_k", 10)
-                if search_type is None:
-                    search_type = (
-                        cfg.get("ai", {})
-                        .get("retriever", {})
-                        .get("search_type", "similarity")
-                    )
+            if k is None:
+                k = int(self.cfg.get("ai", {}).get("retriever", {}).get("top_k", 10))
+            if search_type is None:
+                search_type = (
+                    self.cfg.get("ai", {})
+                    .get("retriever", {})
+                    .get("search_type", "similarity")
+                )
+
             vectorstore = FAISS.load_local(
                 index_path,
                 embeddings,
@@ -96,8 +97,11 @@ class ConversationalRAG:
                 allow_dangerous_deserialization=True,  # ok if you trust the index
             )
 
+            # Merge k into search_kwargs without clobbering provided keys
             if search_kwargs is None:
                 search_kwargs = {"k": k}
+            else:
+                search_kwargs = {"k": k, **search_kwargs}
 
             self.retriever = vectorstore.as_retriever(
                 search_type=search_type, search_kwargs=search_kwargs
@@ -143,7 +147,7 @@ class ConversationalRAG:
                 user_input=user_input,
                 answer_preview=str(answer)[:150],
             )
-            return answer
+            return str(answer)
         except Exception as e:
             log.error("Failed to invoke ConversationalRAG", error=str(e))
             raise DocumentPortalException("Invocation error in ConversationalRAG", sys)
@@ -163,6 +167,7 @@ class ConversationalRAG:
 
     @staticmethod
     def _format_docs(docs) -> str:
+        """Format retrieved documents into a single context string."""
         return "\n\n".join(getattr(d, "page_content", str(d)) for d in docs)
 
     def _build_lcel_chain(self):
@@ -204,3 +209,15 @@ class ConversationalRAG:
                 "Failed to build LCEL chain", error=str(e), session_id=self.session_id
             )
             raise DocumentPortalException("Failed to build LCEL chain", sys)
+
+    # ---------- Convenience ----------
+
+    @property
+    def is_ready(self) -> bool:
+        """Return True if the retriever and chain are ready for invocation."""
+        return self.retriever is not None and self.chain is not None
+
+    def clear(self) -> None:
+        """Clear retriever and chain to free resources or reinitialize later."""
+        self.retriever = None
+        self.chain = None
