@@ -191,5 +191,7 @@ def maybe_init_semantic_cache(cfg: dict) -> None:
         _safe = f"{_scheme}://{_host}{(':' + str(_port)) if _port else ''}"
     except Exception:
         _safe = "(unparsed)"
-    log.info("Initializing semantic cache", redis_source=_redis_source, redis_host=_safe)
+    log.info(
+        "Initializing semantic cache", redis_source=_redis_source, redis_host=_safe
+    )
     init_semantic_cache(redis_url=redis_url, embedding_provider=provider, cfg=cfg)
