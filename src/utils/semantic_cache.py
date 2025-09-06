@@ -179,6 +179,19 @@ def maybe_init_semantic_cache(cfg: dict) -> None:
         return
 
     provider = cache_cfg.get("embedding_provider", "openai")
+    # Allow overriding provider via secrets/env (e.g., EMBEDDING_PROVIDER=azure-openai)
+    try:
+        from src.utils.model_loader import ApiKeyManager as _AKM
+
+        _prov_override = _AKM().get("EMBEDDING_PROVIDER")
+    except Exception:
+        _prov_override = None
+    if not _prov_override:
+        _prov_override = os.getenv("EMBEDDING_PROVIDER") or os.getenv(
+            "AI_EMBEDDING_PROVIDER"
+        )
+    if _prov_override:
+        provider = _prov_override
     # Normalize alias
     if provider == "azure":
         provider = "azure-openai"
@@ -192,6 +205,9 @@ def maybe_init_semantic_cache(cfg: dict) -> None:
     except Exception:
         _safe = "(unparsed)"
     log.info(
-        "Initializing semantic cache", redis_source=_redis_source, redis_host=_safe
+        "Initializing semantic cache",
+        redis_source=_redis_source,
+        redis_host=_safe,
+        embedding_provider=provider,
     )
     init_semantic_cache(redis_url=redis_url, embedding_provider=provider, cfg=cfg)
