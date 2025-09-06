@@ -149,22 +149,47 @@ def maybe_init_semantic_cache(cfg: dict) -> None:
 
     # Prefer secure secret loading: API_KEYS bundle -> env -> YAML fallback
     redis_url: Optional[str] = None
+    _redis_source = ""
     try:
         from src.utils.model_loader import ApiKeyManager
 
         _akm = ApiKeyManager()
         redis_url = _akm.get("REDIS_URL")
+        if redis_url:
+            _redis_source = "secret"
     except Exception:
         # Secrets manager/bundle may not be configured; continue
         pass
 
     if not redis_url:
-        redis_url = os.getenv(
-            "REDIS_URL", cache_cfg.get("redis_url", "redis://localhost:6379")
+        env_val = os.getenv("REDIS_URL")
+        if env_val:
+            redis_url = env_val
+            _redis_source = "env"
+        else:
+            redis_url = cache_cfg.get("redis_url", "redis://localhost:6379")
+            _redis_source = "yaml"
+
+    # In production, avoid silently falling back to localhost if no secret/env was provided
+    if os.getenv("ENV", "local").lower() == "production" and _redis_source == "yaml":
+        # Log a concise warning and skip semantic cache init to avoid misleading failures
+        log.warning(
+            "Semantic cache not initialized: REDIS_URL missing in secrets/env; skipping in production"
         )
+        return
 
     provider = cache_cfg.get("embedding_provider", "openai")
     # Normalize alias
     if provider == "azure":
         provider = "azure-openai"
+    # Small debug to help ops understand where REDIS_URL was sourced from (no credentials included)
+    try:
+        _p = urlparse(redis_url)
+        _host = _p.hostname or "?"
+        _port = _p.port
+        _scheme = _p.scheme
+        _safe = f"{_scheme}://{_host}{(':' + str(_port)) if _port else ''}"
+    except Exception:
+        _safe = "(unparsed)"
+    log.info("Initializing semantic cache", redis_source=_redis_source, redis_host=_safe)
     init_semantic_cache(redis_url=redis_url, embedding_provider=provider, cfg=cfg)
