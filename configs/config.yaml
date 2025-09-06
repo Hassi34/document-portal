@@ -49,6 +49,11 @@ ai:
     chunk_size: 1000
     chunk_overlap: 200
 
+  output_parsing:
+    enable_fix: true
+    enable_retry: true
+    retry_max_attempts: 1
+
   llm:
     groq:
       model_name: "deepseek-r1-distill-llama-70b"
@@ -71,3 +76,18 @@ ai:
       model_name: "gpt-4o"
       temperature: 0
       max_output_tokens: 2048
+
+secrets:
+  # Name of the environment variable that contains a JSON object with API keys/settings
+  aws_secret_manager_keys_env_var: "API_KEYS"
+  # List of known keys to load/validate; ApiKeyManager will read these from the JSON bundle
+  # and fall back to individual environment variables with the same names.
+  known_keys:
+    - "GOOGLE_API_KEY"
+    - "GROQ_API_KEY"
+    - "OPENAI_API_KEY"
+    - "AZURE_OPENAI_API_KEY"
+    - "AZURE_OPENAI_API_INSTANCE_NAME"
+    - "AZURE_OPENAI_API_VERSION"
+    - "AZURE_OPENAI_API_DEPLOYMENT_NAME"
+    - "AZURE_OPENAI_API_EMBEDDING_DEPLOYMENT_NAME"

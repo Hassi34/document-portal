@@ -10,5 +10,4 @@ wheels/
 .venv
 .env
 data/
-uv.lock
 logs/

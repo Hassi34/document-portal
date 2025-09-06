@@ -1,10 +1,12 @@
 from typing import Any
-from fastapi import APIRouter, UploadFile, File, HTTPException
-from src.ai.document_ingestion.data_ingestion import DocHandler
+
+from fastapi import APIRouter, File, HTTPException, UploadFile
+
 from src.ai.document_analyzer.data_analysis import DocumentAnalyzer
+from src.ai.document_ingestion.data_ingestion import DocHandler
+from src.schemas.api.ouput import AnalyzeResponse
 from src.utils.document_ops import FastAPIFileAdapter, read_pdf_via_handler
 from src.utils.logger import GLOBAL_LOGGER as log
-from src.schemas.api.ouput import AnalyzeResponse
 
 router = APIRouter(prefix="/analyze", tags=["analyze"])
 

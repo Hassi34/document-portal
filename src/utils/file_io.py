@@ -1,18 +1,19 @@
 from __future__ import annotations
+
 """File I/O helpers for saving uploads and generating session IDs."""
 
-import re
 import uuid
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Iterable, List
 from zoneinfo import ZoneInfo
-from typing import Iterable, List, Any
 
-from src.utils.logger import GLOBAL_LOGGER as log
-from src.utils.exception.custom_exception import DocumentPortalException
 from src.utils.config_loader import get_supported_extensions
+from src.utils.exception.custom_exception import DocumentPortalException
+from src.utils.logger import GLOBAL_LOGGER as log
 
 SUPPORTED_EXTENSIONS = get_supported_extensions()
+
 
 # ----------------------------- #
 # Helpers (file I/O + loading)  #
@@ -27,7 +28,10 @@ def generate_session_id(prefix: str = "session") -> str:
         A unique session identifier string.
     """
     tz = ZoneInfo("America/Los_Angeles")
-    return f"{prefix}_{datetime.now(tz).strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
+    return (
+        f"{prefix}_{datetime.now(tz).strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
+    )
+
 
 def save_uploaded_files(uploaded_files: Iterable[Any], target_dir: Path) -> List[Path]:
     """Persist uploaded files to disk and return their local paths.

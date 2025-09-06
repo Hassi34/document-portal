@@ -1,0 +1,66 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Success (checkout)
+        if: success()
+        run: echo "✅ Checkout succeeded"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Success (python setup)
+        if: success()
+        run: echo "✅ Python setup succeeded"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Success (uv install)
+        if: success()
+        run: |
+          uv --version
+          echo "✅ uv installed"
+
+      - name: Cache venv
+        uses: actions/cache@v4
+        with:
+          path: |
+            .venv
+          key: ${{ runner.os }}-uv-${{ hashFiles('uv.lock') }}
+
+      - name: Success (cache)
+        if: success()
+        run: echo "✅ Cache prepared"
+
+      - name: Sync dependencies (locked)
+        run: |
+          uv sync --frozen
+          echo "✅ Dependencies synced"
+
+      - name: Lint (ruff)
+        run: |
+          uvx ruff check .
+          uvx ruff format --check .
+          echo "✅ Lint passed"
+
+      - name: Syntax check (compileall)
+        run: |
+          uv run python -m compileall -q src tests
+          echo "✅ Syntax check passed"
+
+      - name: Run unit tests
+        run: |
+          uv run pytest -q -s
+          echo "✅ Tests passed"
