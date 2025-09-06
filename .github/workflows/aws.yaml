@@ -32,7 +32,8 @@ jobs:
     needs: [check-status]
     runs-on: ubuntu-latest
     outputs:
-      image: ${{ steps.build-image.outputs.image }}
+        image: ${{ steps.build-image.outputs.image }}
+        image_latest: ${{ steps.build-image.outputs.image_latest }}
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v4
@@ -54,11 +55,22 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          IMAGE_URI=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
-          docker build -t $IMAGE_URI .
-          docker push $IMAGE_URI
-          echo "image=$IMAGE_URI" >> $GITHUB_OUTPUT
+          IMAGE_SHA_URI="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          IMAGE_LATEST_URI="$ECR_REGISTRY/$ECR_REPOSITORY:latest"
+
+          echo "IMAGE_SHA_URI=$IMAGE_SHA_URI" >> $GITHUB_ENV
+          echo "IMAGE_LATEST_URI=$IMAGE_LATEST_URI" >> $GITHUB_ENV
+
+          # Build once, tag twice (sha and latest)
+          docker build -t "$IMAGE_SHA_URI" -t "$IMAGE_LATEST_URI" .
+
+          # Push both tags
+          docker push "$IMAGE_SHA_URI"
+          docker push "$IMAGE_LATEST_URI"
+
+          # Expose outputs
+          echo "image=$IMAGE_SHA_URI" >> $GITHUB_OUTPUT
+          echo "image_latest=$IMAGE_LATEST_URI" >> $GITHUB_OUTPUT
 
   # -------------------------------
   # 2. Deploy to ECS

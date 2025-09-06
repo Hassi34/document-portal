@@ -55,10 +55,35 @@ ai:
     retry_max_attempts: 1
 
   llm:
+    openai:
+      model_name: "gpt-4o-mini"
+      temperature: 0
+      max_output_tokens: 2048
+    google:
+      model_name: "gemini-2.0-flash"
+      temperature: 0
+      max_output_tokens: 2048
+    azure-openai:
+      # Uses Azure OpenAI via deployment (chat)
+      # Requires env: AZURE_OPENAI_API_KEY, AZURE_OPENAI_API_INSTANCE_NAME,
+      # AZURE_OPENAI_API_DEPLOYMENT_NAME, AZURE_OPENAI_API_VERSION
+      model_name: "gpt-4o"
+      temperature: 0
+      max_output_tokens: 2048
     groq:
       model_name: "deepseek-r1-distill-llama-70b"
       temperature: 0
       max_output_tokens: 2048
+
+  semantic_cache:
+    enabled: true
+    embedding_provider: "openai"  # supported: openai | google | azure-openai
+    # Optionally override via env REDIS_URL
+    redis_url: "redis://localhost:6379"
+    # Optional tuning (best-effort; ignored if unsupported by installed version)
+    name: "document-portal"
+    ttl: 3600
+    distance_threshold: 0.2
 
     google:
       model_name: "gemini-2.0-flash"

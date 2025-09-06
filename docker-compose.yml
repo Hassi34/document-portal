@@ -1,0 +1,44 @@
+# Compose stack: app + redis for semantic cache and vector features
+services:
+  redis:
+    image: "redis/redis-stack:7.2.0-v18"
+    container_name: dp-redis
+    ports:
+      - "6379:6379"
+      - "8001:8001"  # Redis Stack UI (optional)
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: document-portal:local
+    container_name: dp-app
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      # Point LangChain caches and any Redis clients to the service DNS
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      # Optional: load the rest of your secrets from .env instead of hardcoding here
+      # (e.g., OPENAI_API_KEY, LLM_PROVIDER, etc.)
+      # Uncomment the next line and create a .env file if desired
+      # - ENV=dev
+    env_file:
+      - .env
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/app/data                 # app data (indices, uploads, etc.)
+      - ./logs:/app/logs                 # app logs
+    restart: unless-stopped
+
+volumes:
+  redis_data:
