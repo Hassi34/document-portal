@@ -13,6 +13,7 @@ from src.api.routers import compare as compare_router
 from src.schemas.api.ouput import HealthResponse
 from src.utils.config_loader import load_config
 from src.utils.logger import GLOBAL_LOGGER as log
+from src.utils.semantic_cache import maybe_init_semantic_cache
 
 # Load API configuration
 _cfg = load_config()
@@ -51,6 +52,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Initialize semantic cache if enabled
+maybe_init_semantic_cache(_cfg)
 
 
 @app.get("/", response_class=HTMLResponse)
