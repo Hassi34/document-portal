@@ -1,5 +1,6 @@
 import os
 from typing import Optional
+from urllib.parse import urlparse
 
 from src.utils.logger import GLOBAL_LOGGER as log
 
@@ -105,9 +106,18 @@ def init_semantic_cache(
 
         cache = RedisSemanticCache(redis_url=redis_url, embeddings=emb, **extras)  # type: ignore
         set_llm_cache(cache)
+        # Avoid logging full redis_url (may include credentials). Log sanitized host only.
+        try:
+            _p = urlparse(redis_url)
+            _host = _p.hostname or "?"
+            _port = _p.port
+            _scheme = _p.scheme
+            _safe = f"{_scheme}://{_host}{(':' + str(_port)) if _port else ''}"
+        except Exception:
+            _safe = "(unparsed)"
         log.info(
             "Semantic cache initialized",
-            redis_url=redis_url,
+            redis_host=_safe,
             embedding_provider=embedding_provider,
         )
     except Exception as e:
@@ -116,11 +126,9 @@ def init_semantic_cache(
 
 def maybe_init_semantic_cache(cfg: dict) -> None:
     """Initialize Redis semantic cache if enabled in config."""
-    # Load local .env for non-production runs so keys exist at startup
+    # Load local .env in non-production environments
     try:
-        import os as _os
-
-        if _os.getenv("ENV", "local").lower() != "production":
+        if os.getenv("ENV", "local").lower() != "production":
             try:
                 from dotenv import load_dotenv  # type: ignore
 
@@ -138,9 +146,23 @@ def maybe_init_semantic_cache(cfg: dict) -> None:
     if not enabled:
         log.info("Semantic cache disabled via config")
         return
-    redis_url = os.getenv(
-        "REDIS_URL", cache_cfg.get("redis_url", "redis://localhost:6379")
-    )
+
+    # Prefer secure secret loading: API_KEYS bundle -> env -> YAML fallback
+    redis_url: Optional[str] = None
+    try:
+        from src.utils.model_loader import ApiKeyManager
+
+        _akm = ApiKeyManager()
+        redis_url = _akm.get("REDIS_URL")
+    except Exception:
+        # Secrets manager/bundle may not be configured; continue
+        pass
+
+    if not redis_url:
+        redis_url = os.getenv(
+            "REDIS_URL", cache_cfg.get("redis_url", "redis://localhost:6379")
+        )
+
     provider = cache_cfg.get("embedding_provider", "openai")
     # Normalize alias
     if provider == "azure":
