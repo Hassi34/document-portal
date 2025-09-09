@@ -1,0 +1,18 @@
+{
+  "data/example.txt": {
+    "mtime": 1757376139,
+    "size": 6
+  },
+  "data/testtting.txt": {
+    "mtime": 1757374687,
+    "size": 2
+  },
+  "logs/a.log": {
+    "mtime": 1757377649,
+    "size": 0
+  },
+  "logs/abc.log": {
+    "mtime": 1757376713,
+    "size": 0
+  }
+}

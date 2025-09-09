@@ -2,18 +2,24 @@
   "family": "documentportaltd",
   "networkMode": "awsvpc",
   "requiresCompatibilities": ["FARGATE"],
-  "cpu": "2048",
-  "memory": "8192",
+  "cpu": "1024",
+  "memory": "2048",
   "executionRoleArn": "arn:aws:iam::809948819797:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::809948819797:role/ecsTaskExecutionRole",
+  "ephemeralStorage": { "sizeInGiB": 21 },
   "containerDefinitions": [
     {
       "name": "document-portal-container",
       "image": "809948819797.dkr.ecr.us-east-2.amazonaws.com/documentportal",
       "cpu": 1024,
-      "memory": 6144,
+      "memory": 2048,
       "essential": true,
       "portMappings": [
-        { "name": "http", "containerPort": 8080, "hostPort": 8080, "protocol": "tcp" }
+        { "containerPort": 8080, "protocol": "tcp" }
+      ],
+      "mountPoints": [
+        { "sourceVolume": "document-portal-data-vol", "containerPath": "/app/data", "readOnly": false },
+        { "sourceVolume": "document-portal-logs-vol", "containerPath": "/app/logs", "readOnly": false }
       ],
       "environment": [
   { "name": "ENV", "value": "production" }
@@ -32,6 +38,34 @@
           "awslogs-stream-prefix": "document-portal-app",
           "awslogs-create-group": "true"
         }
+      },
+      "healthCheck": {
+        "command": ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 10
+      },
+      "readonlyRootFilesystem": false
+    }
+  ],
+  "volumes": [
+    {
+      "name": "document-portal-data-vol",
+      "efsVolumeConfiguration": {
+        "fileSystemId": "fs-0446d38beddbf7c70",
+        "authorizationConfig": { "accessPointId": "fsap-0ea97ccd7a64f3146", "iam": "ENABLED" },
+        "rootDirectory": "/",
+        "transitEncryption": "ENABLED"
+      }
+    },
+    {
+      "name": "document-portal-logs-vol",
+      "efsVolumeConfiguration": {
+        "fileSystemId": "fs-0446d38beddbf7c70",
+        "authorizationConfig": { "accessPointId": "fsap-0e8c8b3c63f08f0db", "iam": "ENABLED" },
+        "rootDirectory": "/",
+        "transitEncryption": "ENABLED"
       }
     }
   ]
