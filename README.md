@@ -18,6 +18,7 @@ FastAPI-based platform to analyze, compare, and chat with documents using config
 13. [Backup Service](#backup-service)
 14. [Logging & Troubleshooting](#logging--troubleshooting)
 15. [Development](#development)
+17. [Linting & Formatting](#linting--formatting)
 16. [Security](#security)
 17. [License](#license)
 
@@ -382,6 +383,38 @@ uv run -m backup_service.cli --config backup_config.yaml --bucket my-bucket --pr
 - Type annotations and docstrings are being added across modules; contributions welcome.
 - Keep changes config-driven; avoid reintroducing hardcoded paths.
 - When changing public behavior, add/update tests and docs.
+
+## Linting & Formatting
+
+Ruff is used for both lint rules and code formatting.
+
+Format the code (applies changes):
+
+```bash
+uv run ruff format
+```
+
+Run lint check (no changes, CI will fail on violations):
+
+```bash
+uv run ruff check .
+```
+
+Typical CI pipeline runs `ruff check .` and `ruff format --check .` (or equivalently relies on `check` plus a separate formatting check). If you want to ensure a clean commit locally, run both commands before pushing.
+
+Optional pre-commit hook (create `.git/hooks/pre-commit`):
+
+```bash
+#!/usr/bin/env bash
+uv run ruff format
+uv run ruff check . || exit 1
+```
+
+Make it executable:
+
+```bash
+chmod +x .git/hooks/pre-commit
+```
 
 ## Security
 
