@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 from typing import Dict
 
 from fastapi import FastAPI, Request
@@ -14,8 +15,10 @@ from src.schemas.api.ouput import HealthResponse
 from src.utils.config_loader import load_config
 from src.utils.logger import GLOBAL_LOGGER as log
 from src.utils.semantic_cache import maybe_init_semantic_cache
+from src.utils.env_bootstrap import bootstrap_env
 
 # Load API configuration
+bootstrap_env(required=["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION"])
 _cfg = load_config()
 _api_intro = _cfg.get("api", {}).get("intro", {})
 _api_tags = _cfg.get("api", {}).get("openapi_tags", [])
@@ -55,6 +58,8 @@ app.add_middleware(
 
 # Initialize semantic cache if enabled
 maybe_init_semantic_cache(_cfg)
+
+#! Embedded S3 backup removed; use dedicated backup container/task.
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -117,3 +122,6 @@ app.include_router(compare_router.router, prefix=API_VERSION_END_POINT)
 
 # ---------- CHAT ----------
 app.include_router(chat_router.router, prefix=API_VERSION_END_POINT)
+
+
+# No backup shutdown handling needed.

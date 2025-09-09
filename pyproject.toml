@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "PyYAML>=6.0.2",
+    "boto3>=1.40.26",
     "docx2txt>=0.9",
     "faiss-cpu>=1.11.0.post1",
     "fastapi>=0.116.1",
