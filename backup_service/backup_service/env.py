@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import os
 import json
+import os
 from typing import Iterable
 
-from .logging import get_logger, configure_logging
+from .logging import configure_logging, get_logger
 
 log = get_logger("env")
 
@@ -28,7 +28,7 @@ def load_env(required: Iterable[str] | None = None, bundle_env: str = "API_KEYS"
             env_path = os.getenv("BACKUP_DOTENV_PATH", ".env")
             if os.path.exists(env_path):
                 try:
-                    with open(env_path, "r") as f:
+                    with open(env_path) as f:
                         for line in f:
                             line=line.strip()
                             if not line or line.startswith("#") or "=" not in line:
@@ -46,7 +46,7 @@ def load_env(required: Iterable[str] | None = None, bundle_env: str = "API_KEYS"
             data = json.loads(raw)
             if isinstance(data, dict):
                 for k, v in data.items():
-                    if isinstance(k, str) and isinstance(v, (str, int, float)):
+                    if isinstance(k, str) and isinstance(v, (str | int | float)):
                         _set_missing(k, str(v))
                 log.info("api_keys_expanded", extra={"count": len(data)})
         except Exception as e:  # noqa: BLE001

@@ -1,5 +1,5 @@
-from pathlib import Path
 import os
+from pathlib import Path
 from typing import Dict
 
 from fastapi import FastAPI, Request
@@ -13,9 +13,9 @@ from src.api.routers import chat as chat_router
 from src.api.routers import compare as compare_router
 from src.schemas.api.ouput import HealthResponse
 from src.utils.config_loader import load_config
+from src.utils.env_bootstrap import bootstrap_env
 from src.utils.logger import GLOBAL_LOGGER as log
 from src.utils.semantic_cache import maybe_init_semantic_cache
-from src.utils.env_bootstrap import bootstrap_env
 
 # Load API configuration
 bootstrap_env(required=["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION"])

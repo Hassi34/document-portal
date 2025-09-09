@@ -1,20 +1,20 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
-import json
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any, Dict
 
 try:
     import yaml  # type: ignore
 except Exception:  # pragma: no cover
     yaml = None  # type: ignore
 
+from .backup_core import PeriodicRunner, run_backup_once
 from .env import load_env
 from .logging import get_logger
-from .backup_core import run_backup_once, PeriodicRunner
 
  # logger will be initialized in main after env variables are loaded
 

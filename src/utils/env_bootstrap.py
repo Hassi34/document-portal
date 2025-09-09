@@ -43,7 +43,7 @@ def bootstrap_env(required: Iterable[str] | None = None, api_keys_env: str = "AP
             data = json.loads(raw)
             if isinstance(data, dict):
                 for k, v in data.items():
-                    if isinstance(k, str) and isinstance(v, (str, int, float)):
+                    if isinstance(k, str) and isinstance(v, (str | int | float)):
                         _set_if_missing(k, str(v))
                 log.info("Expanded API_KEYS JSON bundle", count=len(data))
         except Exception as e:  # noqa: BLE001
