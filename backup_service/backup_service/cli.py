@@ -16,7 +16,7 @@ from .backup_core import PeriodicRunner, run_backup_once
 from .env import load_env
 from .logging import get_logger
 
- # logger will be initialized in main after env variables are loaded
+# logger will be initialized in main after env variables are loaded
 
 
 def _load_config_file(explicit: Path | None) -> Dict[str, Any]:
@@ -35,7 +35,9 @@ def _load_config_file(explicit: Path | None) -> Dict[str, Any]:
     if env_path:
         candidates.append(Path(env_path))
     candidates.append(Path("backup_config.yaml"))
-    candidates.append(Path(__file__).resolve().parent.parent.parent / "backup_config.yaml")
+    candidates.append(
+        Path(__file__).resolve().parent.parent.parent / "backup_config.yaml"
+    )
     seen: set[Path] = set()
     for p in candidates:
         if p in seen:
@@ -56,17 +58,39 @@ def _load_config_file(explicit: Path | None) -> Dict[str, Any]:
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Document Portal Backup Service (YAML-config driven)")
-    p.add_argument("--config", help="Path to backup_config.yaml (overrides BACKUP_CONFIG_PATH)")
+    p = argparse.ArgumentParser(
+        description="Document Portal Backup Service (YAML-config driven)"
+    )
+    p.add_argument(
+        "--config", help="Path to backup_config.yaml (overrides BACKUP_CONFIG_PATH)"
+    )
     # Optional overrides (CLI > YAML)
     p.add_argument("--bucket", help="S3 bucket (override YAML)")
     p.add_argument("--prefix", help="S3 key prefix (override YAML)")
-    p.add_argument("--dirs", help="Comma separated list of source directories (override YAML)")
-    p.add_argument("--interval", type=int, help="Seconds between runs (override YAML; 0/absent = single run)")
-    p.add_argument("--manifest", default=os.getenv("BACKUP_MANIFEST", ".backup_manifest.json"))
-    p.add_argument("--no-incremental", action="store_true", help="Disable incremental mode (per-file uploads)")
-    p.add_argument("--archive", action="store_true", help="Create a tar.gz snapshot instead of per-file upload")
-    p.add_argument("--once", action="store_true", help="Single run then exit even if interval > 0")
+    p.add_argument(
+        "--dirs", help="Comma separated list of source directories (override YAML)"
+    )
+    p.add_argument(
+        "--interval",
+        type=int,
+        help="Seconds between runs (override YAML; 0/absent = single run)",
+    )
+    p.add_argument(
+        "--manifest", default=os.getenv("BACKUP_MANIFEST", ".backup_manifest.json")
+    )
+    p.add_argument(
+        "--no-incremental",
+        action="store_true",
+        help="Disable incremental mode (per-file uploads)",
+    )
+    p.add_argument(
+        "--archive",
+        action="store_true",
+        help="Create a tar.gz snapshot instead of per-file upload",
+    )
+    p.add_argument(
+        "--once", action="store_true", help="Single run then exit even if interval > 0"
+    )
     return p.parse_args()
 
 
@@ -94,7 +118,11 @@ def main() -> int:
         include_dirs = ["/app/data", "/app/logs"]
 
     # Interval resolution
-    interval = args.interval if args.interval is not None else int(s3_cfg.get("interval_seconds", 0) or 0)
+    interval = (
+        args.interval
+        if args.interval is not None
+        else int(s3_cfg.get("interval_seconds", 0) or 0)
+    )
 
     # Mode flags
     incremental = not args.no_incremental and not args.archive
@@ -103,11 +131,14 @@ def main() -> int:
     if bucket:
         try:
             import boto3  # local import to avoid unused at parse time
+
             s3_client = boto3.client("s3")
             s3_client.head_bucket(Bucket=bucket)
             log.info("s3_bucket_check", extra={"bucket": bucket, "status": "ok"})
         except Exception as e:  # noqa: BLE001
-            log.error("s3_bucket_check_failed", extra={"bucket": bucket, "error": str(e)})
+            log.error(
+                "s3_bucket_check_failed", extra={"bucket": bucket, "error": str(e)}
+            )
             return 4
 
     run_backup_once(

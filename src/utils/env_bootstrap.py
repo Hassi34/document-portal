@@ -18,7 +18,9 @@ def _set_if_missing(key: str, value: str | None) -> None:
         os.environ[key] = value
 
 
-def bootstrap_env(required: Iterable[str] | None = None, api_keys_env: str = "API_KEYS") -> None:
+def bootstrap_env(
+    required: Iterable[str] | None = None, api_keys_env: str = "API_KEYS"
+) -> None:
     """Load local .env (if not production) and expand JSON secret bundle.
 
     required: list of env var names we expect (will log if still missing).

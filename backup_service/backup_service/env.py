@@ -14,11 +14,14 @@ def _set_missing(k: str, v: str | None) -> None:
         os.environ[k] = v
 
 
-def load_env(required: Iterable[str] | None = None, bundle_env: str = "API_KEYS") -> None:
+def load_env(
+    required: Iterable[str] | None = None, bundle_env: str = "API_KEYS"
+) -> None:
     if os.getenv("ENV", "local").lower() != "production":
         dotenv_loaded = False
         try:  # pragma: no cover
             from dotenv import load_dotenv  # type: ignore
+
             load_dotenv()
             dotenv_loaded = True
         except Exception:
@@ -30,13 +33,14 @@ def load_env(required: Iterable[str] | None = None, bundle_env: str = "API_KEYS"
                 try:
                     with open(env_path) as f:
                         for line in f:
-                            line=line.strip()
+                            line = line.strip()
                             if not line or line.startswith("#") or "=" not in line:
                                 continue
-                            k,v=line.split("=",1)
-                            k=k.strip(); v=v.strip().strip('"').strip("'")
+                            k, v = line.split("=", 1)
+                            k = k.strip()
+                            v = v.strip().strip('"').strip("'")
                             if k and k not in os.environ:
-                                os.environ[k]=v
+                                os.environ[k] = v
                     log.info("dotenv_fallback_loaded", extra={"path": env_path})
                 except Exception as e:  # noqa: BLE001
                     log.warning("dotenv_fallback_failed", extra={"error": str(e)})

@@ -19,7 +19,9 @@ log = get_logger("core")
 
 
 def _client():
-    return boto3.client("s3", config=BotoConfig(retries={"max_attempts": 5, "mode": "standard"}))
+    return boto3.client(
+        "s3", config=BotoConfig(retries={"max_attempts": 5, "mode": "standard"})
+    )
 
 
 def _iter_files(dirs: Iterable[Path]):
@@ -125,7 +127,10 @@ def run_backup_once(
                     mapped_path = resolved
                     log.info("dir_created", extra={"path": str(mapped_path)})
                 except Exception as e:  # noqa: BLE001
-                    log.error("dir_create_failed", extra={"path": str(resolved), "error": str(e)})
+                    log.error(
+                        "dir_create_failed",
+                        extra={"path": str(resolved), "error": str(e)},
+                    )
                     continue
         if mapped_path and mapped_path not in seen:
             seen.add(mapped_path)
@@ -134,7 +139,11 @@ def run_backup_once(
     prefix = prefix.rstrip("/") + "/" if prefix else ""
     s3 = _client()
     manifest_file = Path(manifest_path) if manifest_path else None
-    manifest = load_manifest(manifest_file) if (manifest_file and incremental and not archive) else {}
+    manifest = (
+        load_manifest(manifest_file)
+        if (manifest_file and incremental and not archive)
+        else {}
+    )
 
     # Pre-scan files for counting
     all_files = list(_iter_files(dirs))
@@ -145,7 +154,9 @@ def run_backup_once(
             "files_found": len(all_files),
             "bucket": bucket,
             "prefix": prefix,
-            "mode": "archive" if archive else ("incremental" if incremental else "full"),
+            "mode": "archive"
+            if archive
+            else ("incremental" if incremental else "full"),
         },
     )
     if not all_files:
