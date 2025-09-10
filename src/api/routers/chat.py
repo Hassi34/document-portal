@@ -7,9 +7,16 @@ from src.ai.document_chat.retrieval import ConversationalRAG
 from src.ai.document_ingestion.data_ingestion import ChatIngestor
 from src.schemas.api.input import ChatIndexParams, ChatQueryParams
 from src.schemas.api.ouput import ChatIndexResponse, ChatQueryResponse
+from src.services.tracing import (
+    record_chat_generation,
+    record_embedding_batch,
+    run_chat_rag,
+)
 from src.utils.config_loader import load_config
 from src.utils.document_ops import FastAPIFileAdapter
 from src.utils.logger import GLOBAL_LOGGER as log
+
+# Note: Langfuse callbacks are handled inside services.tracing; no direct context use here.
 
 _cfg = load_config()
 FAISS_BASE = (
@@ -58,6 +65,22 @@ async def chat_build_index(
             chunk_overlap=params.chunk_overlap,
             k=params.k,
         )
+        # Embedding usage recording via observed service helper
+        try:
+            provider = os.getenv("EMBEDDING_PROVIDER", "openai")
+            if provider == "azure":
+                provider = "azure-openai"
+            emb_cfg = _cfg.get("ai", {}).get("embedding_model", {}).get(provider, {})
+            emb_model = emb_cfg.get("model_name", "embedding-model")
+            texts: list[str] = []
+            for f in wrapped:
+                try:
+                    texts.append(f.read_text())
+                except Exception:
+                    continue
+            record_embedding_batch(emb_model, provider, texts, session_id=ci.session_id)
+        except Exception:  # pragma: no cover
+            pass
         log.info(f"Index created successfully for session: {ci.session_id}")
         return {
             "session_id": ci.session_id,
@@ -102,7 +125,23 @@ async def chat_query(
             index_name=FAISS_INDEX_NAME,
             search_type=RETRIEVER_SEARCH_TYPE,
         )
-        response = rag.invoke(params.question, chat_history=[])
+        # Run under an observed helper which attaches the Langfuse handler
+        response = run_chat_rag(
+            rag, params.question, session_id=params.session_id, k=params.k
+        )
+        # Record usage via observed helper (no deprecated langfuse_context)
+        try:
+            provider = os.getenv("CHAT_PROVIDER", os.getenv("LLM_PROVIDER", "openai"))
+            model_name = getattr(rag.llm, "_dp_model_name", None) or "unknown-model"
+            record_chat_generation(
+                model=model_name,
+                provider=provider,
+                prompt=params.question,
+                response_text=str(response),
+                session_id=params.session_id,
+            )
+        except Exception:
+            pass
         log.info("Chat query handled successfully.")
 
         return {
