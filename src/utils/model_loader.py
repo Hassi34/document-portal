@@ -19,6 +19,13 @@ from src.utils.config_loader import load_config
 from src.utils.exception.custom_exception import DocumentPortalException
 from src.utils.logger.custom_logging import CustomLogger
 
+
+def maybe_wrap_llm(
+    llm, provider: str, model: str
+):  # deprecated no-op retained for compatibility
+    return llm
+
+
 log = CustomLogger().get_logger(__name__)
 
 
@@ -205,6 +212,9 @@ class ModelLoader:
                 max_output_tokens=max_tokens,
                 google_api_key=self.api_keys.get("GOOGLE_API_KEY"),
             )
+            # attach metadata
+            setattr(llm, "_dp_provider", provider_key)
+            setattr(llm, "_dp_model_name", model_name)
             return llm
 
         elif provider_key == "groq":
@@ -214,16 +224,21 @@ class ModelLoader:
                 api_key=self.api_keys.get("GROQ_API_KEY"),
                 temperature=temperature,
             )
+            setattr(llm, "_dp_provider", provider_key)
+            setattr(llm, "_dp_model_name", model_name)
             return llm
 
         elif provider_key == "openai":
             self.api_keys.require(["OPENAI_API_KEY"])
-            return ChatOpenAI(
+            llm = ChatOpenAI(
                 model=model_name,
                 api_key=self.api_keys.get("OPENAI_API_KEY"),
                 temperature=temperature,
                 max_tokens=max_tokens,
             )
+            setattr(llm, "_dp_provider", provider_key)
+            setattr(llm, "_dp_model_name", model_name)
+            return llm
 
         elif provider_key == "azure-openai":
             # Azure OpenAI chat via Azure-specific wrapper per docs
@@ -240,7 +255,7 @@ class ModelLoader:
             deployment = self.api_keys.get("AZURE_OPENAI_API_DEPLOYMENT_NAME")
             api_version = self.api_keys.get("AZURE_OPENAI_API_VERSION")
             azure_endpoint = f"https://{instance}.openai.azure.com/"
-            return AzureChatOpenAI(
+            llm = AzureChatOpenAI(
                 azure_endpoint=azure_endpoint,
                 azure_deployment=deployment,
                 openai_api_version=api_version,
@@ -248,6 +263,9 @@ class ModelLoader:
                 temperature=temperature,
                 max_tokens=max_tokens,
             )
+            setattr(llm, "_dp_provider", provider_key)
+            setattr(llm, "_dp_model_name", model_name)
+            return llm
 
         else:
             log.error("Unsupported LLM provider", provider=provider_key)

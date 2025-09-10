@@ -11,6 +11,8 @@ from fastapi.templating import Jinja2Templates
 from src.api.routers import analyze as analyze_router
 from src.api.routers import chat as chat_router
 from src.api.routers import compare as compare_router
+from src.api.routers import metrics as metrics_router
+from src.observability.langfuse_tracing import init_langfuse
 from src.schemas.api.ouput import HealthResponse
 from src.utils.config_loader import load_config
 from src.utils.env_bootstrap import bootstrap_env
@@ -41,6 +43,25 @@ app = FastAPI(
     openapi_url=f"{API_VERSION_END_POINT}/openapi.json",
     openapi_tags=_api_tags,
 )
+
+from src.observability.langfuse_tracing import flush_langfuse_events
+
+
+@app.on_event("startup")
+def _startup_init_observability():  # pragma: no cover (startup hook)
+    try:
+        init_langfuse()  # logs connection status itself
+    except Exception as e:  # safety net, never block startup
+        log.error("Langfuse startup init failed", error=str(e))
+
+
+@app.on_event("shutdown")
+def _shutdown_flush_langfuse():
+    try:
+        flush_langfuse_events()  # logs flush status
+    except Exception as e:
+        log.error("Langfuse flush failed on shutdown", error=str(e))
+
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 app.mount(
@@ -122,6 +143,5 @@ app.include_router(compare_router.router, prefix=API_VERSION_END_POINT)
 
 # ---------- CHAT ----------
 app.include_router(chat_router.router, prefix=API_VERSION_END_POINT)
-
-
-# No backup shutdown handling needed.
+# ---------- METRICS ----------
+app.include_router(metrics_router.router, prefix=API_VERSION_END_POINT)

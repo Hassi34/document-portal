@@ -1,6 +1,7 @@
 from typing import Any
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
+from langfuse import observe  # type: ignore
 
 from src.ai.document_analyzer.data_analysis import DocumentAnalyzer
 from src.ai.document_ingestion.data_ingestion import DocHandler
@@ -12,6 +13,7 @@ router = APIRouter(prefix="/analyze", tags=["analyze"])
 
 
 @router.post("", response_model=AnalyzeResponse)
+@observe()
 async def analyze_document(file: UploadFile = File(...)) -> Any:
     try:
         log.info(f"Received file for analysis: {file.filename}")

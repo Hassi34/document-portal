@@ -15,6 +15,14 @@ from src.utils.exception.custom_exception import DocumentPortalException
 from src.utils.logger import GLOBAL_LOGGER as log
 from src.utils.model_loader import ModelLoader
 
+"""Conversational RAG chain (LCEL) with optional callback support for Langfuse.
+
+Instrumentation is now expected to be performed at the API layer using
+`langfuse.decorators.observe` and the LangChain handler callbacks rather than
+direct custom trace/span helpers inside this class. This keeps the LCEL graph
+comprised only of Runnable-compatible components.
+"""
+
 
 class ConversationalRAG:
     """LCEL-based Conversational RAG with lazy retriever initialization.
@@ -122,9 +130,16 @@ class ConversationalRAG:
             raise DocumentPortalException("Loading error in ConversationalRAG", sys)
 
     def invoke(
-        self, user_input: str, chat_history: Optional[List[BaseMessage]] = None
+        self,
+        user_input: str,
+        chat_history: Optional[List[BaseMessage]] = None,
+        callbacks: Optional[List[Any]] = None,
     ) -> str:
-        """Invoke the LCEL pipeline and return the model's answer as text."""
+        """Invoke the LCEL chain.
+
+        callbacks: optional LangChain callback handlers (e.g., Langfuse handler)
+        passed via API layer instrumentation.
+        """
         try:
             if self.chain is None:
                 raise DocumentPortalException(
@@ -133,7 +148,8 @@ class ConversationalRAG:
                 )
             chat_history = chat_history or []
             payload = {"input": user_input, "chat_history": chat_history}
-            answer = self.chain.invoke(payload)
+            run_config = {"callbacks": callbacks} if callbacks else None
+            answer = self.chain.invoke(payload, config=run_config)  # type: ignore[arg-type]
             if not answer:
                 log.warning(
                     "No answer generated",

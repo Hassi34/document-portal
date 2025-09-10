@@ -83,7 +83,7 @@ ai:
     # Optional tuning (best-effort; ignored if unsupported by installed version)
     name: "document-portal"
     ttl: 3600
-    distance_threshold: 0.2
+    distance_threshold: 0.1
 
     google:
       model_name: "gemini-2.0-flash"
@@ -117,3 +117,8 @@ secrets:
     - "AZURE_OPENAI_API_DEPLOYMENT_NAME"
     - "AZURE_OPENAI_API_EMBEDDING_DEPLOYMENT_NAME"
     - "REDIS_URL"
+
+observability:
+  langfuse:
+    enabled: true  # can be overridden by env LANGFUSE_TRACING_ENABLED=false
+    sample_rate: 1.0  # 0-1.0

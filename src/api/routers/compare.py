@@ -1,6 +1,7 @@
 from typing import Any
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
+from langfuse import observe  # type: ignore
 
 from src.ai.document_compare.document_comparator import DocumentComparatorLLM
 from src.ai.document_ingestion.data_ingestion import DocumentComparator
@@ -12,6 +13,7 @@ router = APIRouter(prefix="/compare", tags=["compare"])
 
 
 @router.post("", response_model=CompareResponse)
+@observe()
 async def compare_documents(
     reference: UploadFile = File(...), actual: UploadFile = File(...)
 ) -> Any:
