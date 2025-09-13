@@ -3,11 +3,51 @@ __pycache__/
 *.py[oc]
 build/
 dist/
-wheels/
-*.egg-info
-
-# Virtual environments
-.venv
-.env
-data/
+# Jupyter Notebook
+.ipynb_checkpoints
+# VS Code
+.vscode/
+# macOS
+.DS_Store
+# Logs
 logs/
+*.log
+# Environment variables
+.env
+.venv/
+env/
+venv/
+ENV/
+# Data files
+data/
+# Temporary files
+*.tmp
+# Backup files
+*.bak
+# SQLite database files
+*.sqlite3
+*.db
+# Wheels
+wheels/
+# Egg info
+*.egg-info
+# MyPy
+.mypy_cache/
+# Pytest
+.pytest_cache/
+# Coverage reports
+.coverage
+htmlcov/
+# Tox
+.tox/
+.nox/
+# Celery
+celerybeat-schedule
+# Sphinx documentation
+docs/_build/
+# Pyre type checker
+.pyre/
+# Cython debug symbols
+cython_debug/
+# RUFF
+.ruff_cache/

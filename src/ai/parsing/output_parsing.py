@@ -11,7 +11,7 @@ Behavior is config-driven via configs/config.yaml under ai.output_parsing.
 
 from __future__ import annotations
 
-from typing import Any, Optional, Type
+from typing import Any, Type
 
 from langchain.output_parsers import OutputFixingParser, RetryOutputParser
 from langchain_core.output_parsers import PydanticOutputParser
@@ -81,7 +81,7 @@ def build_structured_chain(
         except Exception:
             # Build the original prompt value to supply to parse_with_prompt
             prompt_value = prompt.format_prompt(**inputs)
-            last_err: Optional[Exception] = None
+            last_err: Exception | None = None
             for _ in range(max(1, retry_max)):
                 try:
                     # Requires the raw LLM text; here we re-ask the model via prompt | llm

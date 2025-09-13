@@ -1,5 +1,4 @@
 import os
-from typing import Optional
 from urllib.parse import urlparse
 
 from src.utils.logger import GLOBAL_LOGGER as log
@@ -72,7 +71,7 @@ def _load_embeddings_for_provider(cfg: dict, provider: str):
 
 
 def init_semantic_cache(
-    redis_url: str, embedding_provider: str = "openai", cfg: Optional[dict] = None
+    redis_url: str, embedding_provider: str = "openai", cfg: dict | None = None
 ) -> None:
     """Initialize LangChain semantic LLM cache with Redis.
 
@@ -148,7 +147,7 @@ def maybe_init_semantic_cache(cfg: dict) -> None:
         return
 
     # Prefer secure secret loading: API_KEYS bundle -> env -> YAML fallback
-    redis_url: Optional[str] = None
+    redis_url: str | None = None
     _redis_source = ""
     try:
         from src.utils.model_loader import ApiKeyManager

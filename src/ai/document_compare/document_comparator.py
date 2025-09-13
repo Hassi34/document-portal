@@ -8,13 +8,13 @@ from langfuse import get_client  # type: ignore
 from langfuse.langchain import CallbackHandler  # type: ignore
 from pydantic import BaseModel
 
+from llm_observability.src.tracing import record_comparison
 from src.ai.parsing.output_parsing import (
     build_structured_chain,
     get_pydantic_parser,
 )
 from src.ai.prompt.prompt_library import PROMPT_REGISTRY
 from src.schemas.ai.models import PromptType, SummaryResponse
-from src.services.tracing import record_comparison
 from src.utils.exception.custom_exception import DocumentPortalException
 from src.utils.logger import GLOBAL_LOGGER as log
 from src.utils.model_loader import ModelLoader

@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import tarfile
 import tempfile
 import threading
 import time
 from pathlib import Path
-from typing import Dict, Iterable, Optional
+from typing import Dict, Iterable
 
 import boto3
 from botocore.config import Config as BotoConfig
@@ -75,7 +74,7 @@ def run_backup_once(
     bucket: str,
     prefix: str,
     include_dirs: Iterable[str],
-    manifest_path: Optional[str] = None,
+    manifest_path: str | None = None,
     incremental: bool = True,
     archive: bool = False,
 ) -> int:

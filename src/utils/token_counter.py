@@ -11,8 +11,6 @@ Dependencies are optional; this module soft-fails to heuristic when missing.
 
 from __future__ import annotations
 
-from typing import Callable
-
 
 def _openai_encoding_for_model(model: str) -> str:
     name = (model or "").lower()

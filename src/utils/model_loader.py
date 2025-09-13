@@ -3,7 +3,7 @@
 import json
 import os
 import sys
-from typing import Any, Dict, List, Optional
+from typing import List
 
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
@@ -67,10 +67,10 @@ class ApiKeyManager:
         if masked:
             log.info("API keys loaded", keys=masked)
 
-    def get(self, key: str, default: Optional[str] = None) -> Optional[str]:
+    def get(self, key: str, default: str | None = None) -> str | None:
         return self._store.get(key, os.getenv(key, default))
 
-    def require(self, keys: str | List[str]) -> Optional[str]:
+    def require(self, keys: str | List[str]) -> str | None:
         """Ensure required env var(s) exist.
 
         - If a single key (str) is provided, return its value on success.

@@ -5,16 +5,9 @@ Soft-fails if env/config disabled or keys missing.
 
 from __future__ import annotations
 
-import os
-import threading
-import time
-import uuid
-from typing import Any, Dict, Optional
-
 from langfuse import get_client  # type: ignore
 from langfuse.langchain import CallbackHandler  # type: ignore
 
-from src.utils.config_loader import load_config
 from src.utils.logger import GLOBAL_LOGGER as log
 
 

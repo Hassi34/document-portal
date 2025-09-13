@@ -3,15 +3,15 @@ from typing import Any, List
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
-from src.ai.document_chat.retrieval import ConversationalRAG
-from src.ai.document_ingestion.data_ingestion import ChatIngestor
-from src.schemas.api.input import ChatIndexParams, ChatQueryParams
-from src.schemas.api.ouput import ChatIndexResponse, ChatQueryResponse
-from src.services.tracing import (
+from llm_observability.src.tracing import (
     record_chat_generation,
     record_embedding_batch,
     run_chat_rag,
 )
+from src.ai.document_chat.retrieval import ConversationalRAG
+from src.ai.document_ingestion.data_ingestion import ChatIngestor
+from src.schemas.api.input import ChatIndexParams, ChatQueryParams
+from src.schemas.api.ouput import ChatIndexResponse, ChatQueryResponse
 from src.utils.config_loader import load_config
 from src.utils.document_ops import FastAPIFileAdapter
 from src.utils.logger import GLOBAL_LOGGER as log
