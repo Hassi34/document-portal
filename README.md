@@ -2,10 +2,28 @@
 
 FastAPI-based platform to analyze, compare, and chat with documents using configurable RAG pipelines (FAISS + multi-provider embeddings / LLMs). Configuration is centralized in `configs/config.yaml`. An independent S3 backup micro-service (in `backup_service/`) handles periodic EFS→S3 snapshots outside the API process.
 
+<div align="center">
+
+![Features & Cloud Stack](assets/features_n_stack.png)
+
+</div>
+
+---
+
 ## Table of Contents
-1. [Features](#features)
+
+1. [Introduction](#introduction)
+    - [Features](#features)
+    - [High-Level Design](#high-level-design)
+    - [Low-Level Design & Component Interactions](#low-level-design--component-interactions)
 2. [Architecture Overview](#architecture-overview)
+    - [Request Flow](#detailed-sequence-request-path)
+    - [Backup Flow](#detailed-sequence-backup-task)
+    - [Diagrams](#example-ascii-diagram)
 3. [Cloud / Infrastructure Architecture](#cloud--infrastructure-architecture)
+    - [Core AWS Components](#core-aws-components)
+    - [IAM / Security Model](#iam--security-model)
+    - [Networking / VPC](#networking--vpc)
 4. [Project Structure](#project-structure)
 5. [Data Directories](#data-directories)
 6. [Prerequisites](#prerequisites)
@@ -14,13 +32,25 @@ FastAPI-based platform to analyze, compare, and chat with documents using config
 9. [Environment Variables](#environment-variables)
 10. [Running the App](#running-the-app)
 11. [Core Workflows](#core-workflows)
+  - [Chat (RAG)](#1-chat-over-documents-rag)
+  - [Document Analysis](#2-document-analysis)
+  - [Document Comparison](#3-document-comparison)
 12. [Azure OpenAI Specifics](#azure-openai-specifics)
 13. [Backup Service](#backup-service)
 14. [Logging & Troubleshooting](#logging--troubleshooting)
 15. [Development](#development)
-17. [Linting & Formatting](#linting--formatting)
-16. [Security](#security)
-17. [License](#license)
+  - [Dev Dependencies](#dev-dependencies-uv-groups)
+16. [Linting & Formatting](#linting--formatting)
+17. [Security](#security)
+18. [License](#license)
+19. [Support & Connect](#support--connect)
+19. [Support & Connect](#support--connect)
+
+---
+
+## Introduction
+
+The system is designed for teams needing a configurable, provider-agnostic document understanding and retrieval layer with strong observability, token usage tracking, and operational isolation (API vs backup service). Observability leverages Langfuse for generation spans and usage metadata without double-counting inner operations.
 
 ## Features
 
@@ -31,42 +61,238 @@ FastAPI-based platform to analyze, compare, and chat with documents using config
 - Provider-pluggable LLM and embeddings with Azure OpenAI support
 - Structured logging and helpful exception traces
 
-## Architecture Overview
+### High-Level Design
 
-High-level components:
-- API Layer (FastAPI): routers for analysis, chat (RAG), compare, health.
-- Embeddings & LLM Providers: OpenAI, Google, Groq, Azure OpenAI (selected via env).
-- Vector Store: FAISS (session-aware indices for multi-user isolation).
-- Semantic Cache (optional): Initialized conditionally for response reuse.
-- Storage Layout: Document artifacts and indices under `data/` with per-domain subfolders.
-- Backup Service: Decoupled container/task performing incremental or archive uploads to S3 based on a YAML config; does not import app code.
+| Concern | Summary |
+|---------|---------|
+| API Layer | FastAPI routers (`chat`, `analyze`, `compare`, `health`) expose JSON endpoints + minimal HTML landing page. |
+| Ingestion & Indexing | PDF/text extraction, chunking, embedding via provider-selected model; FAISS index stored per session (optional) with auto-dimension rebuild. |
+| Retrieval-Augmented Generation (RAG) | LCEL chain composes retriever + LLM into final answer; session isolation optional. |
+| Analysis & Comparison | Structured extraction & diff operations producing normalized artifacts for consumption / auditing. |
+| Observability | Langfuse `@observe` on outer operations + manual `update_current_generation` for token usage & cost inference (pre/post). Single span per logical call. |
+| Token & Cost Tracking | Central counter infers usage across providers with tiktoken (exact for OpenAI/Azure) + heuristic fallback. Recorded to Langfuse metadata. |
+| Configuration | Central YAML (`configs/config.yaml`) with API metadata, vector DB, retriever, model selection, secrets env var mapping. |
+| Backup Service | Decoupled micro-service periodically syncing EFS data/logs to S3 (incremental or archive). No app code imports. |
+| Storage Layout | Under `data/` separated by domain, plus per-session subdirectories if enabled. |
+| Caching / Optional | Redis semantic cache initialization gated by config & available env keys. |
+| Security & Secrets | Keys loaded from aggregated JSON (`API_KEYS`) first, then env fallback, failing fast when missing. |
+| Deployment | CI (lint/tests) → conditional ECS build/deploy workflow (main branch gate). |
 
-## Cloud / Infrastructure Architecture
+#### High-Level Workflow (Diagram)
 
-This section describes how the application and backup service run inside AWS. Adjust to match ECS vs EC2 deployment model you choose.
-
-### Core AWS Components
-| Component | Purpose |
-|----------|---------|
-| Amazon ECS (Fargate) or EC2 ASG | Runs the FastAPI API container (stateless) |
-| Amazon ECS Scheduled Task / EventBridge Scheduler | Triggers the backup container on an interval (e.g. hourly) |
-| Amazon S3 (primary bucket) | Stores uploaded user documents & derived artifacts (optional if using only EFS) |
-| Amazon S3 (backup bucket or prefix) | Receives incremental / archive backups from `backup_service` |
-| Amazon EFS | Persistent shared file system for API (documents, FAISS indices, logs) and backup task read-only mounts |
-| Amazon ECR | Container image registry for API & backup images |
-| Amazon CloudWatch Logs | Centralized structured logs (API & backup) |
-| Amazon EventBridge Scheduler | Cron / rate scheduling of backup ECS task |
-| CloudWatch Metrics / Alarms (optional) | Alert on failed task runs or error patterns |
-| AWS Secrets Manager / Parameter Store (optional) | Centralized API key storage; injected as JSON bundle (API_KEYS) |
-| IAM Roles (Task Execution / Task Role / Scheduler Role) | Principle-of-least-privilege separation |
-
-### High-Level Data Flow
+```mermaid
+graph TD
+  Client[Client / UI] --> API[FastAPI API Layer]
+  API -->|Index Docs| ING[Ingestion & Chunking]
+  ING --> EMB[Embeddings Provider]
+  EMB --> IDX[(FAISS Index)]
+  API -->|Query| RET[Retriever]
+  RET --> IDX
+  API -->|Analyze| ANA[Analyzer]
+  API -->|Compare| CMP[Comparator]
+  API --> LLM[LLM Provider]
+  API --> OBS[Langfuse Observability]
+  IDX --> STORE[(EFS Data / Indices)]
+  ING --> STORE
+  ANA --> STORE
+  CMP --> STORE
+  subgraph Out-of-Band
+    BKS[Backup Service]
+  end
+  BKS --> STORE
+  BKS --> S3[(S3 Backups)]
+  OBS --> LOGS[(Logs / Usage Metadata)]
+  classDef ext fill:#eef,stroke:#447,color:#000;
+  classDef store fill:#ffe,stroke:#aa7,color:#000;
+  class IDX,STORE,S3 store;
+  class LLM,EMB ext;
 ```
-User → API (FastAPI / ECS) → (Embeddings + LLM Providers) → FAISS Index (EFS) → Responses
 
-Backup Flow (Out-of-band):
-EventBridge Scheduler → ECS Fargate Task (backup image) → Reads /data & /logs (EFS) → S3 (incremental keys) → CloudWatch Logs
+#### Primary Data Flows
+1. Upload → Ingest → Embed → Index → Query → Retrieve → LLM Generate → Return answer + usage.
+2. Backup scheduler → Enumerate changed files/logs → Manifest diff → S3 upload → Structured log events.
+
+#### Non-Goals
+* Not a multi-tenant auth platform (session isolation is filesystem-based only).
+* No built‑in advanced access control or billing allocation (can be layered on).
+
+### Low-Level Design & Component Interactions
+
+#### Module Responsibilities
+| Module | Key Files | Responsibility |
+|--------|-----------|----------------|
+| Ingestion | `src/ai/document_ingestion/*` | Normalize document bytes to text chunks; handle idempotent index rebuilds. |
+| Retrieval | `src/ai/document_chat/retrieval.py` | Session-aware FAISS retriever & LCEL assembly; wrapper for observed RAG execution. |
+| Analysis | `src/ai/document_analyzer/*` | PDF extraction + structured content summarization + generation metadata updates. |
+| Comparison | `src/ai/document_compare/*` | Reference vs target diff workflows; attaches usage metadata. |
+| Observability | `llm_observability/src/tracing.py`, `src/observability/langfuse_tracing.py` | Span creation, generation metadata enrichment, graceful shutdown flush. |
+| Config Loader | `src/utils/config_loader.py` | YAML parsing + environment key override resolution. |
+| Model Loader | `src/utils/model_loader.py` | Provider selection, environment loading, secret normalization. |
+| Token Counting | `src/utils/token_counter.py` | Approx/ exact token and cost estimation by provider & model. |
+| Semantic Cache | `src/utils/semantic_cache.py` | Optional Redis backed embedding similarity cache initialization. |
+| Schemas | `src/schemas/api/*` | Pydantic models / form adapters for request validation. |
+| Exceptions | `src/utils/exception/*` | Custom exception normalization and consistent error raising. |
+| Backup Service | `backup_service/backup_service/*` | Incremental / archive S3 sync; manifest + structured log outputs. |
+
+#### Low-Level Workflow (Diagram)
+
+```mermaid
+flowchart TD
+  %% VERTICAL LOW-LEVEL WORKFLOW (PRINT FRIENDLY)
+  %% LAYERS TOP → BOTTOM
+
+  subgraph L0[Client Requests]
+    UPL[Upload /chat/index]
+    ASK[Query /chat/query]
+    ANA_REQ[Analyze /analyze]
+    CMP_REQ[Compare /compare]
+  end
+
+  subgraph L1[FastAPI Routers]
+    CHAT_API[Chat]
+    ANALYZE_API[Analyze]
+    COMPARE_API[Compare]
+  end
+
+  subgraph L2[Ingestion]
+    SAVE[Persist Files]
+    CHUNK[Chunk & Normalize]
+    EMBED[Batch Embed]
+    DIM{Dim Match?}
+    REBUILD[Rebuild Index]
+    UPSERT[Upsert Vectors]
+  end
+
+  subgraph L3[Analysis & Diff]
+    PDF_PARSE[PDF Parse]
+    DIFF[Diff Engine]
+  end
+
+  subgraph L4[Retrieval & Generation]
+    LOAD[Load Index]
+    RETR[Retrieve k]
+    PROMPT[Prompt Build]
+    CALL[LLM Call]
+  end
+
+  subgraph L5[Observability]
+    SPAN[Langfuse Span]
+    USAGE[Token & Cost]
+  end
+
+  subgraph L6[Storage & External]
+    IDX[(FAISS Index)]
+    EFSData[(EFS /data)]
+    EFSLogs[(EFS /logs)]
+    BKSVC[Backup Service]
+    EB[EventBridge]
+    S3[(S3 Backups)]
+  end
+
+  %% FLOWS CORE
+  UPL --> CHAT_API
+  ASK --> CHAT_API
+  ANA_REQ --> ANALYZE_API
+  CMP_REQ --> COMPARE_API
+
+  CHAT_API --> SAVE --> CHUNK --> EMBED --> DIM
+  DIM -- No --> REBUILD --> UPSERT
+  DIM -- Yes --> UPSERT
+  UPSERT --> IDX
+  SAVE --> EFSData
+  IDX --> EFSData
+
+  CHAT_API --> LOAD --> RETR --> PROMPT --> CALL
+  LOAD --> IDX
+  RETR --> IDX
+
+  ANALYZE_API --> PDF_PARSE --> SPAN
+  COMPARE_API --> DIFF --> SPAN
+  CALL --> SPAN
+  PDF_PARSE --> USAGE
+  DIFF --> USAGE
+  SPAN --> USAGE --> EFSLogs
+
+  EB --> BKSVC
+  BKSVC --> EFSData
+  BKSVC --> EFSLogs
+  BKSVC --> IDX
+  BKSVC --> S3
+
+  UPSERT -.-> LOAD
+
+  classDef entry fill:#f0f8ff,stroke:#036,color:#000;
+  classDef api fill:#e8f5e9,stroke:#2e7d32,color:#000;
+  classDef ingest fill:#fff8e1,stroke:#b28900,color:#000;
+  classDef analysis fill:#f3e5f5,stroke:#7b1fa2,color:#000;
+  classDef retrieval fill:#ede7f6,stroke:#512da8,color:#000;
+  classDef observ fill:#e3f2fd,stroke:#1565c0,color:#000;
+  classDef store fill:#fbe9e7,stroke:#d84315,color:#000;
+  classDef decision fill:#fff2cc,stroke:#d4a017,color:#000;
+
+  class UPL,ASK,ANA_REQ,CMP_REQ entry;
+  class CHAT_API,ANALYZE_API,COMPARE_API api;
+  class SAVE,CHUNK,EMBED,DIM,REBUILD,UPSERT ingest;
+  class PDF_PARSE,DIFF analysis;
+  class LOAD,RETR,PROMPT,CALL retrieval;
+  class SPAN,USAGE observ;
+  class IDX,EFSData,EFSLogs,BKSVC,S3,EB store;
+  class DIM decision;
 ```
+
+> Note: EFS provides two mounted paths (`/data` for documents, indices; `/logs` for structured logs). EventBridge triggers the backup task which reads from EFS and writes incremental objects to S3. FAISS index files live under `/data/faiss_index`.
+
+#### Additional Sequences (Detailed)
+1. Chat Query: validation → retrieval → RAG chain (@observe) → usage attach → response.
+2. Indexing: dimension check → optional rebuild → batch embedding → upsert → counts return.
+3. Backup: manifest load → scan diff → upload changed files → manifest write → log summary.
+
+#### Error Handling & Resilience (Summary)
+| Aspect | Strategy |
+|--------|----------|
+| Missing Keys | Immediate exception; prevents partial startup. |
+| Index Dimension Mismatch | Automatic index rebuild for that session. |
+| Provider Failure | Exception propagated; structured log context. |
+| Observability Handler Missing | Loud warning; continue without spans. |
+| Parser Failures | Retry + optional output repair chain. |
+
+#### Concurrency & Performance Notes
+* Session id namespacing; assume single-writer per session.
+* Batched embeddings; idempotent indexing avoids duplicates.
+* Optional semantic cache for similar prompt reuse.
+* Token estimation cached per model/provider pair.
+
+#### Extensibility Highlights
+| Extension | How |
+|-----------|-----|
+| New LLM Provider | Add branch in model loader + cost map + token encoding fallback. |
+| New Vector DB | Adapter implementing retriever contract. |
+| Alternate Observability | Swap Langfuse wrapper with unified interface. |
+| Multi-Tenant Auth | Middleware + per-tenant root directory structure. |
+
+#### Security Notes
+* Centralized secret ingestion.
+* Dev tooling isolated from runtime deps.
+* No raw secrets in logs.
+
+#### Future Enhancements (Backlog)
+* Streaming usage metrics (Prometheus)
+* Background re-chunking service
+* Provider-native usage for all vendors
+* Authorization / tenancy layer
+
+## License
+
+This project is licensed under the terms of the LICENSE file included in the repository.
+
+## Support & Connect
+
+If you find this project useful:
+* Please consider ★ starring the repository — it helps others discover it.
+* Connect / reach out on LinkedIn: [Your Name](https://www.linkedin.com/in/your-profile/) (replace with your profile URL).
+* Share feedback or open an issue for ideas, bugs, or enhancements.
+
+Early adopters and contributors are welcome — feel free to submit PRs for tests, providers, or observability improvements.
 
 ### Detailed Sequence (Request Path)
 1. Client calls `/api/v1/chat/index` with documents.
@@ -176,6 +402,210 @@ pyproject.toml                # Root project dependencies
 uv.lock                       # Resolved lock (uv)
 README.md                     # (This file)
 ```
+
+### Expanded Source Tree (Key Modules)
+
+```
+src/
+  api/
+    main.py                   # FastAPI app initialization, router inclusion
+    routers/
+      chat.py                 # Chat (RAG) endpoints (index/query)
+      analyze.py              # Document analysis endpoints
+      compare.py              # Document comparison endpoints
+      health.py               # Liveness / readiness
+  ai/
+    document_ingestion/       # Normalization, chunking, index management
+    document_chat/            # Retrieval + chain assembly (FAISS + LCEL)
+    document_analyzer/        # PDF parsing & structured extraction
+    document_compare/         # Diff / comparison logic
+  observability/
+    langfuse_tracing.py       # Startup/shutdown + handler factory
+  schemas/
+    api/                      # Pydantic request/response schemas
+  utils/
+    config_loader.py          # YAML + env overlay
+    model_loader.py           # Provider env and secret resolution
+    token_counter.py          # Token & cost inference
+    semantic_cache.py         # Optional Redis semantic cache init
+    exception/                # Custom exception types
+  client/
+    templates/                # HTML template(s)
+    static/                   # CSS/JS assets (minimal)
+llm_observability/
+  src/tracing.py              # Centralized Langfuse span helpers & usage updates
+backup_service/
+  backup_service/
+    backup_core.py            # Incremental/archive logic
+    cli.py                    # Entry point
+```
+
+---
+
+## Detailed Project Workflow
+
+### 1. Document Indexing (Chat RAG Setup)
+1. Client uploads one or more documents to `/api/v1/chat/index`.
+2. Files persisted to `data/document_chat[/<session_id>]`.
+3. Ingestion layer extracts text → chunks (size & overlap from config).
+4. Embeddings generated in batches (provider chosen via env/config).
+5. FAISS index (global or per-session) created / updated; dimension mismatch triggers auto-rebuild.
+6. Embedding batch usage recorded (`record_embedding_batch`) — no nested span duplication.
+7. Response returns counts + session context.
+
+### 2. Query (RAG)
+1. User asks question via `/api/v1/chat/query` (with optional session_id).
+2. Retriever loads FAISS index; `k` top chunks retrieved.
+3. LCEL chain composes system + context + user prompt for selected LLM.
+4. `run_chat_rag` executes under Langfuse `@observe` (single generation span).
+5. Pre-update sets input + model metadata; post-update attaches usage (tokens, estimated cost).
+6. Answer + session id returned.
+
+### 3. Document Analysis
+1. Upload call stores PDF under `data/document_analysis[/session]`.
+2. Analyzer extracts structured content (text, pages, stats).
+3. LLM summarization / enrichment (if configured) updates generation metadata.
+4. Artifacts persisted; references returned to caller.
+
+### 4. Document Comparison
+1. Reference + target uploaded to comparison endpoint.
+2. Normalization + diff logic produce summary & change set.
+3. Langfuse generation usage recorded (single logical span).
+4. Diff artifacts stored in `data/document_compare[/session]`.
+
+### 5. Backup Cycle (Out-of-Band)
+1. Scheduler triggers backup container.
+2. Manifest compared to EFS tree (data + logs).
+3. Changed files uploaded to S3 with prefix mapping.
+4. Manifest updated; structured events logged.
+
+### 6. Startup & Shutdown
+1. App loads config + secrets (JSON bundle first, then env fallback).
+2. Langfuse handler created (failure logs ALL-CAPS warning, no silent downgrade).
+3. On shutdown, handler flush invoked for final span export.
+
+### 7. Token & Cost Accounting
+1. For OpenAI/Azure: exact counts via tiktoken + model metadata.
+2. For others: heuristic token estimate (character / avg token ratio).
+3. Standardized usage_details persisted to Langfuse generation.
+
+---
+
+## Sequence Diagram (Chat Query)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Client
+    participant A as FastAPI Chat Router
+    participant R as Retriever (FAISS)
+    participant L as LLM (Provider)
+    participant O as Langfuse
+
+    C->>A: POST /chat/query (question, session_id)
+    A->>R: Load index & retrieve top-k
+    R-->>A: Chunks
+    A->>O: observe(start) generation (input/model)
+    A->>L: Invoke RAG chain (prompt w/ context)
+    L-->>A: Answer + raw usage (if available)
+    A->>O: update_current_generation(output, usage_details)
+    A-->>C: JSON { answer, session_id, usage_summary }
+```
+
+### Sequence Diagram (Document Indexing)
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant C as Client
+  participant I as Ingestion API (index)
+  participant P as Parser/Chunker
+  participant E as Embeddings Provider
+  participant F as FAISS Index
+  participant O as Langfuse
+
+  C->>I: POST /chat/index (files, params)
+  I->>P: Persist & extract text
+  P-->>I: Chunks
+  I->>E: Batch embed chunks
+  E-->>I: Vectors
+  I->>F: Upsert / rebuild index
+  I->>O: record_embedding_batch (metadata)
+  I-->>C: JSON { added, skipped, session_id }
+```
+
+### Sequence Diagram (Document Analysis)
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant C as Client
+  participant A as Analysis API
+  participant P as PDF/Text Extractor
+  participant L as LLM (Summary)
+  participant O as Langfuse
+
+  C->>A: POST /analyze (file, session?)
+  A->>P: Extract pages & metadata
+  P-->>A: Structured text
+  A->>O: observe(start) (input/model)
+  A->>L: Summarize / enrich
+  L-->>A: Summary + usage
+  A->>O: update_current_generation(output, usage)
+  A-->>C: JSON { summary_ref, stats, session_id }
+```
+
+### Sequence Diagram (Document Comparison)
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant C as Client
+  participant CMP as Compare API
+  participant N as Normalizer
+  participant D as Diff Engine
+  participant L as LLM (Optional Eval)
+  participant O as Langfuse
+
+  C->>CMP: POST /compare (reference, target)
+  CMP->>N: Normalize inputs
+  N-->>CMP: Comparable text blocks
+  CMP->>D: Compute diff metrics
+  D-->>CMP: Deltas + stats
+  CMP->>O: observe(start) (input/model) (if LLM scoring)
+  CMP->>L: Generate narrative / quality assessment
+  L-->>CMP: Narrative + usage
+  CMP->>O: update_current_generation(output, usage)
+  CMP-->>C: JSON { differences, narrative }
+```
+
+### Sequence Diagram (Backup Cycle)
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant S as Scheduler (EventBridge)
+  participant B as Backup Container
+  participant FS as EFS (data/logs)
+  participant M as Manifest (local)
+  participant S3 as S3 (Backups)
+
+  S->>B: Trigger task run
+  B->>M: Load previous manifest
+  B->>FS: Scan directories
+  FS-->>B: File list + metadata
+  B->>B: Diff (changed/new/deleted)
+  B->>S3: Upload changed files
+  B->>M: Write updated manifest
+  B-->>S: Log backup_completed
+```
+
+### Notes
+* Only one observed generation per query (no nested spans inside retriever or parser steps).
+* Embedding operations are recorded separately but not decorated to avoid trace clutter.
+* Usage estimation unified across providers; cost mapping configurable.
+
+---
 
 ## Data Directories
 Configurable (see `configs/config.yaml`):
@@ -521,3 +951,12 @@ chmod +x .git/hooks/pre-commit
 ## License
 
 This project is licensed under the terms of the LICENSE file included in the repository.
+
+## Support & Connect
+
+If this project helps you, please ⭐ the repository — it really helps others discover it.
+
+You’re welcome to connect or reach out on LinkedIn:
+- https://www.linkedin.com/in/hasanain-mehmood/
+
+Ideas, issues, improvements? Open an issue or PR. Collaboration is encouraged.
