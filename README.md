@@ -32,18 +32,17 @@ FastAPI-based platform to analyze, compare, and chat with documents using config
 9. [Environment Variables](#environment-variables)
 10. [Running the App](#running-the-app)
 11. [Core Workflows](#core-workflows)
-  - [Chat (RAG)](#1-chat-over-documents-rag)
-  - [Document Analysis](#2-document-analysis)
-  - [Document Comparison](#3-document-comparison)
+    - [Chat (RAG)](#1-chat-over-documents-rag)
+    - [Document Analysis](#2-document-analysis)
+    - [Document Comparison](#3-document-comparison)
 12. [Azure OpenAI Specifics](#azure-openai-specifics)
 13. [Backup Service](#backup-service)
 14. [Logging & Troubleshooting](#logging--troubleshooting)
 15. [Development](#development)
-  - [Dev Dependencies](#dev-dependencies-uv-groups)
+    - [Dev Dependencies](#dev-dependencies-uv-groups)
 16. [Linting & Formatting](#linting--formatting)
 17. [Security](#security)
 18. [License](#license)
-19. [Support & Connect](#support--connect)
 19. [Support & Connect](#support--connect)
 
 ---
@@ -280,19 +279,6 @@ flowchart TD
 * Background re-chunking service
 * Provider-native usage for all vendors
 * Authorization / tenancy layer
-
-## License
-
-This project is licensed under the terms of the LICENSE file included in the repository.
-
-## Support & Connect
-
-If you find this project useful:
-* Please consider ★ starring the repository — it helps others discover it.
-* Connect / reach out on LinkedIn: [Your Name](https://www.linkedin.com/in/your-profile/) (replace with your profile URL).
-* Share feedback or open an issue for ideas, bugs, or enhancements.
-
-Early adopters and contributors are welcome — feel free to submit PRs for tests, providers, or observability improvements.
 
 ### Detailed Sequence (Request Path)
 1. Client calls `/api/v1/chat/index` with documents.
