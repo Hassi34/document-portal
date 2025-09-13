@@ -14,9 +14,8 @@ import json
 import os
 import shutil
 import sys
-import uuid
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List
 
 import fitz  # PyMuPDF
 from langchain.schema import Document
@@ -25,8 +24,6 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from src.utils.config_loader import get_supported_extensions, load_config
 from src.utils.document_ops import (
-    concat_for_analysis,
-    concat_for_comparison,
     load_documents,
 )
 from src.utils.exception.custom_exception import DocumentPortalException
@@ -45,7 +42,7 @@ class FaissManager:
     avoid duplicate additions across runs.
     """
 
-    def __init__(self, index_dir: Path, model_loader: Optional[ModelLoader] = None):
+    def __init__(self, index_dir: Path, model_loader: ModelLoader | None = None):
         self.index_dir = Path(index_dir)
         self.index_dir.mkdir(parents=True, exist_ok=True)
 
@@ -70,7 +67,7 @@ class FaissManager:
             .get("index_name", "index")
         )
         self.emb = self.model_loader.load_embeddings()
-        self.vs: Optional[FAISS] = None
+        self.vs: FAISS | None = None
 
     def _exists(self) -> bool:
         # Presence check uses configured index_name (default 'index')
@@ -117,7 +114,7 @@ class FaissManager:
         return len(new_docs)
 
     def load_or_create(
-        self, texts: Optional[List[str]] = None, metadatas: Optional[List[dict]] = None
+        self, texts: List[str] | None = None, metadatas: List[dict] | None = None
     ) -> FAISS:
         ## if we running first time then it will not go in this block
         if self._exists():
@@ -178,10 +175,10 @@ class FaissManager:
 class ChatIngestor:
     def __init__(
         self,
-        temp_base: Optional[str] = None,
-        faiss_base: Optional[str] = None,
+        temp_base: str | None = None,
+        faiss_base: str | None = None,
         use_session_dirs: bool = True,
-        session_id: Optional[str] = None,
+        session_id: str | None = None,
     ):
         try:
             self.model_loader = ModelLoader()
@@ -302,9 +299,7 @@ class ChatIngestor:
 class DocHandler:
     """PDF save + read (page-wise) for analysis."""
 
-    def __init__(
-        self, data_dir: Optional[str] = None, session_id: Optional[str] = None
-    ):
+    def __init__(self, data_dir: str | None = None, session_id: str | None = None):
         config = load_config()
         default_data_dir = (
             config.get("data", {})
@@ -377,9 +372,7 @@ class DocumentComparator:
     Save, read & combine PDFs for comparison with session-based versioning.
     """
 
-    def __init__(
-        self, base_dir: Optional[str] = None, session_id: Optional[str] = None
-    ):
+    def __init__(self, base_dir: str | None = None, session_id: str | None = None):
         config = load_config()
         default_base_dir = (
             config.get("data", {})

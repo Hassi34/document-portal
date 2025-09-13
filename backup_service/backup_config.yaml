@@ -3,7 +3,7 @@ backup:
     enabled: false                # Internal scheduler toggle (normally use EventBridge / external scheduler)
     bucket: "document-portal-s3"  # REQUIRED: S3 bucket name (now sourced exclusively from this file unless CLI override)
     prefix: "testdata/"            # S3 key prefix (trailing slash normalized)
-    include_dirs: 
+    include_dirs:
       - "/data"
       - "/logs"                # Source directories to back up (container paths or mounted volumes)
     interval_seconds: 900         # Periodic interval (seconds) if not using --once / CLI override

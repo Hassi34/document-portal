@@ -1,7 +1,7 @@
 import os
 import sys
 from operator import itemgetter
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from langchain_community.vectorstores import FAISS
 from langchain_core.messages import BaseMessage
@@ -33,7 +33,7 @@ class ConversationalRAG:
         answer = rag.invoke("What is ...?", chat_history=[])
     """
 
-    def __init__(self, session_id: Optional[str], retriever=None):
+    def __init__(self, session_id: str | None, retriever=None):
         try:
             self.session_id = session_id
             self.cfg = load_config()
@@ -65,10 +65,10 @@ class ConversationalRAG:
     def load_retriever_from_faiss(
         self,
         index_path: str,
-        k: Optional[int] = None,
-        index_name: Optional[str] = None,
-        search_type: Optional[str] = None,
-        search_kwargs: Optional[Dict[str, Any]] = None,
+        k: int | None = None,
+        index_name: str | None = None,
+        search_type: str | None = None,
+        search_kwargs: Dict[str, Any] | None = None,
     ):
         """Load FAISS vectorstore from disk and build retriever + LCEL chain.
 
@@ -132,8 +132,8 @@ class ConversationalRAG:
     def invoke(
         self,
         user_input: str,
-        chat_history: Optional[List[BaseMessage]] = None,
-        callbacks: Optional[List[Any]] = None,
+        chat_history: List[BaseMessage] | None = None,
+        callbacks: List[Any] | None = None,
     ) -> str:
         """Invoke the LCEL chain.
 

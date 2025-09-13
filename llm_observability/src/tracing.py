@@ -8,7 +8,7 @@ Routers should call these helpers rather than embedding inline tracing logic.
 from __future__ import annotations
 
 import os
-from typing import Any, List, Optional, Sequence
+from typing import Any, Sequence
 
 from langfuse import get_client, observe  # type: ignore
 from langfuse.langchain import CallbackHandler  # type: ignore
@@ -19,7 +19,7 @@ from src.utils.token_counter import count_tokens
 
 # ---------------------------- Embeddings ------------------------------------
 def record_embedding_batch(
-    model: str, provider: str, texts: Sequence[str], session_id: Optional[str] = None
+    model: str, provider: str, texts: Sequence[str], session_id: str | None = None
 ) -> int:
     """Record an embedding generation batch.
 
@@ -55,7 +55,7 @@ def record_chat_generation(
     provider: str,
     prompt: str,
     response_text: str,
-    session_id: Optional[str] = None,
+    session_id: str | None = None,
 ):
     """Attach usage metadata for a chat generation already executed."""
     prompt_tokens = max(1, len(prompt) // 4)
@@ -79,7 +79,7 @@ def record_analysis(
     provider: str,
     input_snippet: str,
     output_snippet: str,
-    session_id: Optional[str] = None,
+    session_id: str | None = None,
 ):
     """Add usage for an analysis style generation (structured parsing)."""
     try:
@@ -108,7 +108,7 @@ def record_comparison(
     left: str,
     right: str,
     result_text: str,
-    session_id: Optional[str] = None,
+    session_id: str | None = None,
 ):
     try:
         lt = count_tokens(provider, model, left)
@@ -134,7 +134,7 @@ def record_comparison(
 # ---------------------------- Chat RAG run ----------------------------------
 @observe(as_type="generation")
 def run_chat_rag(
-    rag: Any, question: str, session_id: Optional[str] = None, k: Optional[int] = None
+    rag: Any, question: str, session_id: str | None = None, k: int | None = None
 ) -> Any:
     """
     Execute the RAG chain within a Langfuse trace using a bound handler,

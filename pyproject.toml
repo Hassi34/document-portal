@@ -1,6 +1,6 @@
 [project]
 name = "DocumentPortal"
-version = "0.1.0"
+version = "0.1.1"
 description = "A FastAPI-powered application to analyze, compare, and chat with documents using configurable RAG pipelines and a FAISS vector store."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -10,7 +10,6 @@ dependencies = [
     "docx2txt>=0.9",
     "faiss-cpu>=1.11.0.post1",
     "fastapi>=0.116.1",
-    "jupyter>=1.1.1",
     "langchain>=0.3.27",
     "langchain-community>=0.3.27",
     "langchain-core>=0.3.72",
@@ -22,12 +21,9 @@ dependencies = [
     "pandas>=2.3.1",
     "pymupdf>=1.26.3",
     "pypdf>=5.9.0",
-    "pytest>=8.4.1",
     "python-dotenv>=1.1.1",
     "python-multipart>=0.0.20",
     "redis>=6.4.0",
-    "ruff>=0.12.12",
-    "streamlit>=1.48.0",
     "structlog>=25.4.0",
     "uvicorn>=0.35.0",
 ]
@@ -61,13 +57,10 @@ lint.ignore = [
     "UP007",
     "UP035",
     "UP037",
-    "UP045",
     "D417",
     "E501",
     "E402",  # module level import not at top (legacy layout)
     "E702",  # multiple statements on one line (legacy code)
-    "F401",  # unused imports (temporary while refactoring)
-    "T201",  # print statements allowed for now
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -75,3 +68,11 @@ lint.ignore = [
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
+
+[dependency-groups]
+dev = [
+    "jupyter>=1.1.1",
+    "pytest>=8.4.1",
+    "ruff>=0.12.12",
+    "pre-commit>=4.3.0"
+]

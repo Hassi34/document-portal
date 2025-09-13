@@ -24,7 +24,7 @@
 #         dummy_pdf = DummyFile(PDF_PATH)
 
 #         handler = DocumentHandler(session_id="test_ingestion_analysis")
-        
+
 #         saved_path = handler.save_pdf(dummy_pdf)
 #         print(f"PDF saved at: {saved_path}")
 
@@ -34,7 +34,7 @@
 #         # ---------- STEP 2: DATA ANALYSIS ----------
 #         print("Starting metadata analysis...")
 #         analyzer = DocumentAnalyzer()  # Loads LLM + parser
-        
+
 #         analysis_result = analyzer.analyze_document(text_content)
 
 #         # ---------- STEP 3: DISPLAY RESULTS ----------
@@ -89,14 +89,14 @@ def test_compare_documents():
     # ---- Step 2: Run LLM comparison ---- #
     llm_comparator = DocumentComparatorLLM()
     df = llm_comparator.compare_documents(combined_text)
-    
+
     print("\n Comparison DataFrame:\n")
     print(df)
 
 if __name__ == "__main__":
     test_compare_documents()
-    
-    
+
+
 
 # Testing code for document chat functionality
 
@@ -112,7 +112,7 @@ if __name__ == "__main__":
 # def test_conversational_rag_on_pdf(pdf_path:str, question:str):
 #     try:
 #         model_loader = ModelLoader()
-        
+
 #         if FAISS_INDEX_PATH.exists():
 #             print("Loading existing FAISS index...")
 #             embeddings = model_loader.load_embeddings()
@@ -125,17 +125,17 @@ if __name__ == "__main__":
 #                 uploaded_files = [f]
 #                 ingestor = SingleDocIngestor()
 #                 retriever = ingestor.ingest_files(uploaded_files)
-                
+
 #         print("Running Conversational RAG...")
 #         session_id = "test_conversational_rag"
 #         rag = ConversationalRAG(retriever=retriever, session_id=session_id)
 #         response = rag.invoke(question)
 #         print(f"\nQuestion: {question}\nAnswer: {response}")
-                    
+
 #     except Exception as e:
 #         print(f"Test failed: {str(e)}")
 #         sys.exit(1)
-    
+
 # if __name__ == "__main__":
 #     # Example PDF path and question
 #     pdf_path = "data\\single_document_chat\\NIPS-2017-attention-is-all-you-need-Paper.pdf"
@@ -144,6 +144,6 @@ if __name__ == "__main__":
 #     if not Path(pdf_path).exists():
 #         print(f"PDF file does not exist at: {pdf_path}")
 #         sys.exit(1)
-    
+
 #     # Run the test
 #     test_conversational_rag_on_pdf(pdf_path, question)

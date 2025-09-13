@@ -259,5 +259,3 @@ Temporarily change the bucket in `backup_config.yaml` to an invalid name and run
 uv run -m backup_service.cli --config backup_config.yaml --once
 ```
 Expect `file_upload_failed` events and a final `backup_completed`.
-
-

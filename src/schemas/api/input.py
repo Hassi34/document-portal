@@ -2,7 +2,6 @@ from __future__ import annotations
 
 """Pydantic input models for API endpoints."""
 
-from typing import Optional
 
 from fastapi import Form
 from pydantic import BaseModel, Field, model_validator
@@ -29,7 +28,7 @@ class CompareParams(BaseModel):
 
 
 class ChatIndexParams(BaseModel):
-    session_id: Optional[str] = Field(
+    session_id: str | None = Field(
         default=None,
         description="Session identifier when using per-session directories",
     )
@@ -53,7 +52,7 @@ class ChatIndexParams(BaseModel):
     @classmethod
     def as_form(
         cls,
-        session_id: Optional[str] = Form(None),
+        session_id: str | None = Form(None),
         use_session_dirs: bool = Form(True),
         chunk_size: int = Form(_DEF_CHUNK_SIZE),
         chunk_overlap: int = Form(_DEF_CHUNK_OVERLAP),
@@ -70,7 +69,7 @@ class ChatIndexParams(BaseModel):
 
 class ChatQueryParams(BaseModel):
     question: str = Field(description="User question to ask the RAG system")
-    session_id: Optional[str] = Field(
+    session_id: str | None = Field(
         default=None,
         description="Session identifier when using per-session directories",
     )
@@ -83,7 +82,7 @@ class ChatQueryParams(BaseModel):
     def as_form(
         cls,
         question: str = Form(...),
-        session_id: Optional[str] = Form(None),
+        session_id: str | None = Form(None),
         use_session_dirs: bool = Form(True),
         k: int = Form(_DEF_TOP_K),
     ) -> "ChatQueryParams":
