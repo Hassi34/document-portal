@@ -14,7 +14,7 @@ from src.ai.parsing.output_parsing import (
 )
 from src.ai.prompt.prompt_library import PROMPT_REGISTRY
 from src.schemas.ai.models import PromptType, SummaryResponse
-from src.services.tracing import record_comparison
+from llm_observability.src.tracing import record_comparison
 from src.utils.exception.custom_exception import DocumentPortalException
 from src.utils.logger import GLOBAL_LOGGER as log
 from src.utils.model_loader import ModelLoader

@@ -12,7 +12,7 @@ from src.ai.parsing.output_parsing import (
 )
 from src.ai.prompt.prompt_library import PROMPT_REGISTRY  # type: ignore
 from src.schemas.ai.models import Metadata
-from src.services.tracing import record_analysis
+from llm_observability.src.tracing import record_analysis
 from src.utils.exception.custom_exception import DocumentPortalException
 from src.utils.logger import GLOBAL_LOGGER as log
 from src.utils.model_loader import ModelLoader
