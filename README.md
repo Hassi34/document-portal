@@ -24,6 +24,7 @@ FastAPI-based platform to analyze, compare, and chat with documents using config
     - [Core AWS Components](#core-aws-components)
     - [IAM / Security Model](#iam--security-model)
     - [Networking / VPC](#networking--vpc)
+    - [CI/CD Pipeline](#cicd-pipeline-github-actions)
 4. [Project Structure](#project-structure)
 5. [Data Directories](#data-directories)
 6. [Prerequisites](#prerequisites)
@@ -346,6 +347,109 @@ Principles:
 3. Register / update ECS task definitions (API + backup).
 4. Update Service (API) via blue/green or rolling.
 5. EventBridge schedules reference latest `:prod` or versioned task definition for backup runner.
+
+### CI/CD Pipeline (GitHub Actions)
+This documentation reflects ONLY the two existing workflow files:
+
+1. `.github/workflows/ci.yaml` (workflow name: `CI`)
+2. `.github/workflows/aws.yaml` (workflow name: `CI/CD to ECS Fargate`)
+
+#### 1. ci.yaml (Continuous Integration)
+Trigger:
+- `push` and `pull_request` on branches: `dev`, `main`.
+
+Concurrency:
+- Cancels in‑flight runs for the same ref to keep feedback fast.
+
+Permissions:
+- `contents: read`, `id-token: write` (prepared for future OIDC), `packages: read`.
+
+Matrix:
+- Python versions: 3.10 & 3.11.
+
+Jobs:
+`validate` (always on push/PR):
+- Checkout
+- Python setup (matrix)
+- Cache `uv` downloads (`~/.cache/uv`)
+- Install `uv` (via pip)
+- `uv sync --all-groups` (runtime + dev deps)
+- Lint formatting check: `ruff format --check .`
+- Lint rules: `ruff check .`
+- Tests: `uv run pytest -q` (non-fatal; failure transformed into warning until real tests exist)
+- Upload logs artifact (best-effort)
+
+`build` (only when branch == `main` and `validate` succeeds):
+- Checkout
+- (Optional) QEMU + Buildx setup (enables future multi-arch)
+- (Conditional) AWS credential config via OIDC env vars (currently requires env values to be present)
+- ECR login if `AWS_REGION` & `AWS_ACCOUNT_ID` provided
+- Derive short SHA (first 12 chars) -> `sha_tag`
+- Build two Docker images locally (explicit Dockerfiles):
+  - API (root Dockerfile): `document-portal-api:<sha_tag>`
+  - Backup service (`backup_service/Dockerfile`): `document-portal-backup:<sha_tag>`
+- Conditional push of images (only if `ECR_API_REPO` / `ECR_BACKUP_REPO` env values exist) with `:sha_tag` and `:latest` tags.
+
+`deploy` (only when branch == `main` and `build` succeeded):
+- Placeholder only (no real ECS update yet). Writes `deploy_notes.txt` artifact reminding to implement task definition rendering & service update.
+
+Notes / Current Limitations:
+- This workflow builds images on `main` but does NOT deploy them (deployment happens in the separate `aws.yaml` workflow instead).
+- OIDC variables (`AWS_REGION`, `AWS_ROLE_TO_ASSUME`, etc.) must be provided for cloud steps; otherwise only local image build occurs.
+- Test step allows failures; tighten by removing the `|| echo ... && exit 0` portion once tests are present.
+
+#### 2. aws.yaml (Continuous Deployment to ECS Fargate)
+Trigger:
+- `workflow_run` of workflow `CI` when it completes.
+- Proceeds ONLY if: conclusion == `success` AND `head_branch == 'main'`.
+
+Environment (fixed in file):
+- `AWS_REGION`, `ECR_REPOSITORY`, `ECS_SERVICE`, `ECS_CLUSTER`, `ECS_TASK_DEFINITION`, `CONTAINER_NAME`.
+
+Secrets (required):
+- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (classic credentials; OIDC not yet used here — could be improved).
+
+Jobs:
+`check-status`:
+- Guard: ensures CI passed on `main`.
+
+`build-and-push` (needs: check-status):
+- Checkout
+- Configure AWS credentials (v4 action, static keys)
+- Login to ECR
+- Build single Docker image (root `Dockerfile`) tagged twice: `:<sha>` and `:latest`
+- Push both tags to ECR repository specified by `ECR_REPOSITORY`
+- Expose pushed image URI(s) as outputs (`image`, `image_latest`).
+
+`deploy` (needs: build-and-push):
+- Checkout
+- Configure AWS credentials (older v1 action usage)
+- Render ECS Task Definition (file path: `.github/workflows/task_definition.json`) swapping the container image for the new SHA tag via `amazon-ecs-render-task-definition@v1`
+- Output rendered JSON
+- Deploy updated task definition to the specified Service & Cluster using `amazon-ecs-deploy-task-definition@v1`
+- Wait for service stability.
+
+Important Behavioral Nuances:
+- Docker image is built twice (if a build step is later added to `.github/workflows/ci.yaml`) and again in `.github/workflows/aws.yaml`. Currently, `ci.yaml` only runs tests/lint, while the deployment workflow (`aws.yaml`) performs the build & deploy. Consolidate builds into one workflow to avoid divergence.
+- Deployment only updates ONE container (`CONTAINER_NAME`). If multiple containers (e.g., backup service) need updating, additional render/deploy steps are required.
+- Uses static AWS credentials; consider migrating to GitHub OIDC for short-lived tokens.
+- `task_definition.json` must exist and contain a container definition whose `name` matches `CONTAINER_NAME`.
+
+Suggested Improvements (Roadmap):
+1. Unify build: produce/push images in `ci.yaml` and skip rebuild in `aws.yaml`.
+2. Adopt OIDC in `aws.yaml` (replace static keys).
+3. Fail CI on test failures once tests exist.
+4. Add security scan stage (Trivy) before pushing.
+5. Add environment-specific tagging (e.g., `:main-<date>`).
+6. Promote backup service image deploy via a second ECS service or scheduled task definition update.
+7. Add path filters to skip rebuild when only docs change.
+8. Add integration smoke test: run task with new image, curl `/api/v1/health`, then proceed to production service update.
+
+Minimal Sequence:
+`push/PR (dev/main)` → CI validate (lint/tests) → (main) build images (local) → CI completes (success) → aws.yaml triggered (main) → rebuild & push image → render ECS task → deploy.
+
+Anchor Reference:
+The Table of Contents entry `CI/CD Pipeline` links here via `#cicd-pipeline-github-actions`.
 
 ### Alternative (EC2) Note
 If not using ECS, you can:
